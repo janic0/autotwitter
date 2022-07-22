@@ -1,5 +1,5 @@
 import { getScheduledTweets } from "../routes/schedule";
-import { client, del, get, set } from "./redis.server";
+import { client, get, set } from "./redis.server";
 import { checkFulfillment } from "./schedule.server";
 import secretsServer from "./secrets.server";
 import { sendTelegramMessage } from "./telegram.server";
@@ -23,8 +23,11 @@ const _sendTweet = async (tweet: scheduledTweet, token: string) => {
 			},
 			body: JSON.stringify({ text: tweet.text }),
 		});
-		if (r.status === 201)
-			return del(`scheduled_tweet=${tweet.authorId},${tweet.id}`);
+		console.log(await r.json());
+		set(`scheduled_tweet=${tweet.authorId},${tweet.id}`, {
+			...tweet,
+			sent: r.status === 201,
+		});
 	} catch {
 		console.error("WARNING: FAILED TO SEND TWEET");
 	}

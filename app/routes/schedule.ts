@@ -3,7 +3,8 @@ import { v4 } from "uuid";
 import { tokenCookie } from "../utils/cookies";
 import { client, get, set } from "../utils/redis.server";
 import { PeriodManager, scheduleTweet } from "../utils/schedule.server";
-import { scheduledTweet } from "../utils/types";
+import { scheduledTweet, serverConfig } from "../utils/types";
+import { getConfig } from "./updateConfig";
 
 export const handler = () => {
 	return json(
@@ -59,18 +60,38 @@ export const action = async ({ request }: { request: Request }) => {
 };
 
 export const getScheduledTweets = (
-	userId?: string
+	userId?: string,
+	userConfig?: serverConfig
 ): Promise<scheduledTweet[]> => {
 	return new Promise((res) => {
-		client.keys(`scheduled_tweet=${userId || "*"},*`).then((keys) => {
-			if (!keys.length) return res([]);
-			const values: scheduledTweet[] = [];
-			keys.forEach(async (key) => {
-				const value = await get(key);
-				values.push(value);
-				if (values.length === keys.length)
-					res(values.sort((a, b) => a.created_at - b.created_at));
+		const cb = (period?: PeriodManager) => {
+			client.keys(`scheduled_tweet=${userId || "*"},*`).then((keys) => {
+				if (!keys.length) return res([]);
+				const values: scheduledTweet[] = [];
+				keys.forEach(async (key) => {
+					const value = await get(key);
+					values.push(value);
+					if (values.length === keys.length) {
+						values.sort((a, b) => a.created_at - b.created_at);
+						if (period)
+							res(
+								values.filter((value) =>
+									value.scheduledDate
+										? value.scheduledDate >= period?.currentPeriodStart
+										: null
+								)
+							);
+						else return values;
+					}
+				});
 			});
-		});
+		};
+		if (userId) {
+			if (userConfig) cb(new PeriodManager(userConfig.frequency.type));
+			else
+				getConfig(userId).then((config) =>
+					cb(new PeriodManager(config.frequency.type))
+				);
+		} else cb();
 	});
 };

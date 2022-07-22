@@ -38,7 +38,10 @@ export default function Index() {
 		userMeta: userMeta;
 	} = useLoaderData();
 	const [config, setConfig] = useState(initialConfig);
-	const [savedConfig, setSavedConfig] = useState(initialConfig);
+	const [savedConfig, setSavedConfig] = useState({
+		...initialConfig,
+		time: { ...initialConfig.time, tz: new Date().getTimezoneOffset() },
+	});
 	const [scheduledTweets, setScheduledTweets] = useState(
 		initialScheduledTweets
 	);
@@ -334,9 +337,12 @@ export const loader = async ({ request }: { request: Request }) => {
 				}
 			})();
 
-		const scheduledTweets: scheduledTweet[] = await getScheduledTweets(userId);
 		const userMeta: userMeta = await get("userMeta=" + userId);
 		const config = await getConfig(userId);
+		const scheduledTweets: scheduledTweet[] = await getScheduledTweets(
+			userId,
+			config
+		);
 		return json({
 			scheduledTweets,
 			initialConfig: config,

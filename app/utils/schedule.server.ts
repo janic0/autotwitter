@@ -66,8 +66,11 @@ export async function scheduleTweet(
 	tweet: scheduledTweet,
 	userId: string
 ): Promise<scheduledTweet> {
-	const allTweets: scheduledTweet[] = await getScheduledTweets(userId);
 	const userConfig = await getConfig(userId);
+	const allTweets: scheduledTweet[] = await getScheduledTweets(
+		userId,
+		userConfig
+	);
 	const scheduledDate = _scheduleSingle(tweet, allTweets, userConfig);
 	const newTweet = { ...tweet, scheduledDate };
 	set(`scheduled_tweet=${userId},${tweet.id}`, newTweet);
@@ -225,7 +228,7 @@ export async function checkFulfillment(
 	reality: number;
 }> {
 	const userConfig = await getConfig(userId);
-	const scheduledTweets = await getScheduledTweets(userId);
+	const scheduledTweets = await getScheduledTweets(userId, userConfig);
 
 	const period = new PeriodManager(userConfig.frequency.type);
 
@@ -250,7 +253,7 @@ export async function rescheduleAll(
 ): Promise<scheduledTweet[]> {
 	const allTweets: scheduledTweet[] = inputTweets
 		? inputTweets
-		: await getScheduledTweets(userId);
+		: await getScheduledTweets(userId, config);
 
 	if (!allTweets.length) return [];
 

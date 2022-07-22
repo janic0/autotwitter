@@ -2,7 +2,6 @@ import { json } from "@remix-run/node";
 import { tokenCookie } from "../utils/cookies";
 import { del, set } from "../utils/redis.server";
 import { rescheduleAll } from "../utils/schedule.server";
-import { getScheduledTweets } from "./schedule";
 
 export const action = async ({ request }: { request: Request }) => {
 	const userId = await tokenCookie.parse(request.headers.get("cookie"));
@@ -25,7 +24,7 @@ export const action = async ({ request }: { request: Request }) => {
 		);
 	}
 	if (typeof body === "object" && body && typeof body.id === "string") {
-		await del(`scheduled_tweet=${userId},${body.id}`);	
+		await del(`scheduled_tweet=${userId},${body.id}`);
 		const newScheduledTweets = await rescheduleAll(userId, undefined);
 		return json({
 			ok: true,
