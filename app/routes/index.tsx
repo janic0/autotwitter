@@ -23,10 +23,6 @@ import {
 	startTelegramDeamon,
 } from "../utils/telegram.server";
 
-const compareObjects = (obj1: any, obj2: any) => {
-	return JSON.stringify(obj1) === JSON.stringify(obj2);
-};
-
 export default function Index() {
 	const {
 		scheduledTweets: initialScheduledTweets,
@@ -269,11 +265,7 @@ export default function Index() {
 						)}
 					</div>
 					<button
-						className={`bg-cyan-50 border-primary border-2 text-black rounded transition-all p-2 ${
-							compareObjects(savedConfig, config)
-								? "opacity-0 invisible"
-								: "opacity-100 visible"
-						}`}
+						className="bg-cyan-50 border-primary border-2 text-black rounded transition-all p-2"
 						onClick={updateConfig}
 					>
 						Save and Reschedule
