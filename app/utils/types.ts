@@ -17,6 +17,7 @@ export interface scheduledTweet {
 	id: string;
 	text: string;
 	sent: boolean;
+	random_offset: number;
 	scheduledDate: number | null; // null means never
 	authorId: string;
 	created_at: number;

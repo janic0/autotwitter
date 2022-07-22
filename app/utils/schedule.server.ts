@@ -175,11 +175,11 @@ function _determineTime(
 	}
 }
 
-function calculateOffset(total: number, max: number) {
+function calculateOffset(total: number, max: number, random_offset: number) {
 	const dynamicAreaStart = total / (max || 1);
 	const dynamicAreaEnd = (total + 1) / (max || 1);
 
-	return dynamicAreaStart + Math.random() * (dynamicAreaEnd - dynamicAreaStart);
+	return dynamicAreaStart + random_offset * (dynamicAreaEnd - dynamicAreaStart);
 }
 
 function _scheduleSingle(
@@ -210,7 +210,11 @@ function _scheduleSingle(
 
 	return (
 		_determineTime(
-			calculateOffset(currentScheduledTweets, userConfig.frequency.value),
+			calculateOffset(
+				currentScheduledTweets,
+				userConfig.frequency.value,
+				tweet.random_offset
+			),
 			period,
 			userConfig
 		) || null
@@ -297,7 +301,11 @@ export async function rescheduleAll(
 			const newTweet = {
 				...target,
 				scheduledDate: _determineTime(
-					calculateOffset(currentAmount, userConfig.frequency.value),
+					calculateOffset(
+						currentAmount,
+						userConfig.frequency.value,
+						target.random_offset
+					),
 					period,
 					userConfig
 				),

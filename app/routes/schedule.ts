@@ -42,6 +42,7 @@ export const action = async ({ request }: { request: Request }) => {
 				text: body.text,
 				sent: false,
 				scheduledDate: null,
+				random_offset: Math.random(),
 				authorId: userId,
 				created_at: Date.now(),
 			},
