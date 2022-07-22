@@ -258,6 +258,9 @@ export async function rescheduleAll(
 			(tweet) =>
 				tweet.sent && (tweet.scheduledDate || 0) < period.currentPeriodStart
 		);
+		const unsentTweets: scheduledTweet[] = allTweets.filter(
+			(tweet) => !tweet.sent
+		);
 
 		let currentAmount = sentTweets.filter((tweet) =>
 			tweet.scheduledDate ? period.includes(tweet.scheduledDate) : false
@@ -271,8 +274,8 @@ export async function rescheduleAll(
 				checkPeriodFulfillment();
 			}
 		};
-		while (allTweets.length > newTweets.length) {
-			const target = allTweets[newTweets.length];
+		while (unsentTweets.length > newTweets.length) {
+			const target = unsentTweets[newTweets.length];
 			const newTweet = {
 				...target,
 				scheduledDate: _determineTime(target, period, userConfig),
