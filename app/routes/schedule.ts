@@ -79,10 +79,10 @@ export const getScheduledTweets = (
 								values.filter((value) =>
 									value.scheduledDate
 										? value.scheduledDate >= period?.currentPeriodStart
-										: null
+										: true
 								)
 							);
-						else return values;
+						else res(values);
 					}
 				});
 			});

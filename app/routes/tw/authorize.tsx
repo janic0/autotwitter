@@ -121,7 +121,6 @@ const loader = async ({ request }: { request: Request }) => {
 		accessToken: jsonResp.access_token,
 		accessTokenValidUntil: new Date().getTime() + jsonResp.expires_in * 1000,
 	});
-	_resetConfig(userId);
 
 	return json(
 		{
