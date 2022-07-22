@@ -1,0 +1,7 @@
+node_modules
+
+redis_data/
+/.cache
+/build
+/public/build
+.env
