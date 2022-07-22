@@ -109,45 +109,41 @@ export default function Index() {
 									}`}
 								>
 									{!tweet.sent && (
-										<>
-											<p
-												className="bg-gray-300 absolute rounded-full w-8 h-8 right-0 -top-4 flex justify-center items-center"
-												onClick={() => {
-													fetch("/delete", {
-														method: "DELETE",
-														headers: {
-															"content-type": "application/json",
-														},
-														body: JSON.stringify({ id: tweet.id }),
-													}).then((r) => {
-														if (r.status === 200)
-															r.json().then((d) =>
-																setScheduledTweets(d.result)
-															);
-													});
-												}}
-											>
-												×
-											</p>
-											<div className="flex gap-4">
-												<img
-													className="w-12 h-12 rounded-full"
-													src={userMeta.profile_image_url}
-													alt={userMeta.name + "'s Profile Picture"}
-												/>
-												<div className="flex flex-col flex-1">
-													<p className="">{userMeta.name}</p>
-													<p className="opacity-40">@{userMeta.username}</p>
-												</div>
-												<div className="opacity-80 text-right">
-													{tweet.scheduledDate
-														? new Date(tweet.scheduledDate).toLocaleString()
-														: "Never"}
-												</div>
-											</div>
-											<div>{tweet.text}</div>
-										</>
+										<p
+											className="bg-gray-300 absolute rounded-full w-8 h-8 right-0 -top-4 flex justify-center items-center"
+											onClick={() => {
+												fetch("/delete", {
+													method: "DELETE",
+													headers: {
+														"content-type": "application/json",
+													},
+													body: JSON.stringify({ id: tweet.id }),
+												}).then((r) => {
+													if (r.status === 200)
+														r.json().then((d) => setScheduledTweets(d.result));
+												});
+											}}
+										>
+											×
+										</p>
 									)}
+									<div className="flex gap-4">
+										<img
+											className="w-12 h-12 rounded-full"
+											src={userMeta.profile_image_url}
+											alt={userMeta.name + "'s Profile Picture"}
+										/>
+										<div className="flex flex-col flex-1">
+											<p className="">{userMeta.name}</p>
+											<p className="opacity-40">@{userMeta.username}</p>
+										</div>
+										<div className="opacity-80 text-right">
+											{tweet.scheduledDate
+												? new Date(tweet.scheduledDate).toLocaleString()
+												: "Never"}
+										</div>
+									</div>
+									<div>{tweet.text}</div>
 								</div>
 							))}
 						</div>
