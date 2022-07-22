@@ -2,6 +2,7 @@ import { v4 } from "uuid";
 import { generateAuthURL } from "../routes";
 import buildSearchParams from "./params";
 import { client, get, set } from "./redis.server";
+import { scheduleTweet } from "./schedule.server";
 import secretsServer from "./secrets.server";
 
 let hasStarted = false;
@@ -111,6 +112,49 @@ const intervalHandler = async () => {
 							message.message.chat.id,
 							"Removed from account. Use /start to relink."
 						);
+					}
+				});
+			} else if (message.message.text) {
+				if (message.message.text.length > 280)
+					return sendTelegramMessage(
+						message.message.chat.id,
+						"Message too long. Please use a shorter message."
+					);
+				const prefix = "notificationMethods=";
+				const keys = await client.keys(prefix + "*");
+				keys.forEach(async (key) => {
+					const value = await get(key);
+					if (value?.telegram == message.message.chat.id) {
+						const userId = key.slice(prefix.length);
+						const tweet = await scheduleTweet(
+							{
+								id: v4(),
+								text: message.message.text,
+								scheduledDate: null,
+								random_offset: Math.random(),
+								sent: false,
+								authorId: userId,
+							},
+							userId
+						);
+						if (tweet.scheduledDate) {
+							const sd = new Date(tweet.scheduledDate);
+							sendTelegramMessage(
+								message.message.chat.id,
+								`Tweet scheduled for the ${sd.getDate()}.${sd.getMonth() + 1}.`,
+								{
+									inline_keyboard: [[{ text: "Open", url: secretsServer.URL }]],
+								}
+							);
+						} else {
+							sendTelegramMessage(
+								message.message.chat.id,
+								`Tweet will never be sent, because your settings are defined so.`,
+								{
+									inline_keyboard: [[{ text: "Open", url: secretsServer.URL }]],
+								}
+							);
+						}
 					}
 				});
 			}

@@ -1,6 +1,7 @@
 import { getScheduledTweets } from "../routes/schedule";
 import { client, get, set } from "./redis.server";
 import { checkFulfillment } from "./schedule.server";
+import secretsServer from "./secrets.server";
 import { sendTelegramMessage } from "./telegram.server";
 import getToken from "./tw/getToken.server";
 import type { scheduledTweet } from "./types";
@@ -78,7 +79,12 @@ const reminderIteration = async () => {
 							fulfillment.reality +
 							"/" +
 							fulfillment.expectation +
-							")"
+							")",
+						{
+							inline_keyboard: [
+								[{ text: "Write more tweets", url: secretsServer.URL }],
+							],
+						}
 					);
 			}
 		}
