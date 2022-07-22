@@ -308,6 +308,6 @@ export async function rescheduleAll(
 			currentAmount++;
 			checkPeriodFulfillment();
 		}
-		return newTweets;
+		return [...sentTweets, ...newTweets];
 	}
 }
