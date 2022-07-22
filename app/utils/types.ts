@@ -16,10 +16,10 @@ export type frequencyType = "hour" | "day" | "week";
 export interface scheduledTweet {
 	id: string;
 	text: string;
-	random_offset: number;
 	sent: boolean;
 	scheduledDate: number | null; // null means never
 	authorId: string;
+	created_at: number;
 }
 
 export interface config {

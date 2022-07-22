@@ -2,7 +2,7 @@ import { json } from "@remix-run/node";
 import { v4 } from "uuid";
 import { tokenCookie } from "../utils/cookies";
 import { client, get, set } from "../utils/redis.server";
-import { scheduleTweet } from "../utils/schedule.server";
+import { PeriodManager, scheduleTweet } from "../utils/schedule.server";
 import { scheduledTweet } from "../utils/types";
 
 export const handler = () => {
@@ -39,10 +39,10 @@ export const action = async ({ request }: { request: Request }) => {
 			{
 				id: v4(),
 				text: body.text,
-				random_offset: Math.random(),
 				sent: false,
 				scheduledDate: null,
 				authorId: userId,
+				created_at: Date.now(),
 			},
 			userId
 		);
@@ -68,7 +68,8 @@ export const getScheduledTweets = (
 			keys.forEach(async (key) => {
 				const value = await get(key);
 				values.push(value);
-				if (values.length === keys.length) res(values);
+				if (values.length === keys.length)
+					res(values.sort((a, b) => a.created_at - b.created_at));
 			});
 		});
 	});

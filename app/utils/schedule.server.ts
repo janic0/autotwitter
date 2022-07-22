@@ -75,7 +75,7 @@ export async function scheduleTweet(
 }
 
 function _determineTime(
-	tweet: scheduledTweet,
+	offset: number,
 	period: PeriodManager,
 	config: serverConfig
 ): number {
@@ -109,9 +109,7 @@ function _determineTime(
 						else matchedOptions.push(availableOptions[i]);
 					}
 				}
-				return matchedOptions[
-					Math.floor(tweet.random_offset * matchedOptions.length)
-				];
+				return matchedOptions[Math.floor(offset * matchedOptions.length)];
 			}
 		}
 
@@ -139,13 +137,13 @@ function _determineTime(
 					max.minute * PERIODS.minute +
 					max.hour * PERIODS.hour;
 
-				return rangeStart + tweet.random_offset * (rangeEnd - rangeStart);
+				return rangeStart + offset * (rangeEnd - rangeStart);
 			}
 		}
 
 		case "week": {
 			const days = period.findOptions();
-			const day = days[Math.floor(tweet.random_offset * days.length)];
+			const day = days[Math.floor(offset * days.length)];
 			if (config.time.type === "specific") {
 				return (
 					day +
@@ -164,7 +162,7 @@ function _determineTime(
 				const rangeEnd =
 					day + max.minute * PERIODS.minute + max.hour * PERIODS.hour;
 
-				return rangeStart + tweet.random_offset * (rangeEnd - rangeStart);
+				return rangeStart + offset * (rangeEnd - rangeStart);
 			}
 		}
 
@@ -172,6 +170,13 @@ function _determineTime(
 			return 0;
 		}
 	}
+}
+
+function calculateOffset(total: number, max: number) {
+	const dynamicAreaStart = total / (max || 1);
+	const dynamicAreaEnd = (total + 1) / (max || 1);
+
+	return dynamicAreaStart + Math.random() * (dynamicAreaEnd - dynamicAreaStart);
 }
 
 function _scheduleSingle(
@@ -188,15 +193,25 @@ function _scheduleSingle(
 	const period = new PeriodManager(userConfig.frequency.type);
 	// but right now, we're iterating over the whole list for every period, until we find one that doesn't have enouth already
 
-	while (
+	const calculateAmount = () =>
 		allTweets.filter((tweet) =>
 			tweet.scheduledDate ? period.includes(tweet.scheduledDate) : false
-		).length >= userConfig.frequency.value
-	)
+		).length;
+	let currentScheduledTweets = calculateAmount();
+	while (currentScheduledTweets >= userConfig.frequency.value) {
 		period.nextPeriod();
+		currentScheduledTweets = calculateAmount();
+	}
 
 	// computing the sending date
-	return _determineTime(tweet, period, userConfig) || null;
+
+	return (
+		_determineTime(
+			calculateOffset(currentScheduledTweets, userConfig.frequency.value),
+			period,
+			userConfig
+		) || null
+	);
 }
 
 export async function checkFulfillment(
@@ -244,7 +259,7 @@ export async function rescheduleAll(
 	if (userConfig.frequency.value === 0) {
 		const newTweets = allTweets.map((tweet) => ({
 			...tweet,
-			scheduledDate: null,
+			scheduledDate: tweet.sent ? tweet.scheduledDate : null,
 		}));
 		newTweets.forEach((tweet) =>
 			set(`scheduled_tweet=${userId},${tweet.id}`, tweet)
@@ -255,8 +270,7 @@ export async function rescheduleAll(
 		const newTweets: scheduledTweet[] = [];
 		const period = new PeriodManager(userConfig.frequency.type);
 		const sentTweets: scheduledTweet[] = allTweets.filter(
-			(tweet) =>
-				tweet.sent && (tweet.scheduledDate || 0) < period.currentPeriodStart
+			(tweet) => tweet.sent
 		);
 		const unsentTweets: scheduledTweet[] = allTweets.filter(
 			(tweet) => !tweet.sent
@@ -275,10 +289,15 @@ export async function rescheduleAll(
 			}
 		};
 		while (unsentTweets.length > newTweets.length) {
+			checkPeriodFulfillment();
 			const target = unsentTweets[newTweets.length];
 			const newTweet = {
 				...target,
-				scheduledDate: _determineTime(target, period, userConfig),
+				scheduledDate: _determineTime(
+					calculateOffset(currentAmount, userConfig.frequency.value),
+					period,
+					userConfig
+				),
 			};
 			newTweets.push(newTweet);
 			set(`scheduled_tweet=${userId},${target.id}`, newTweet);

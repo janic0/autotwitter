@@ -131,8 +131,8 @@ const intervalHandler = async () => {
 								id: v4(),
 								text: message.message.text,
 								scheduledDate: null,
-								random_offset: Math.random(),
 								sent: false,
+								created_at: Date.now(),
 								authorId: userId,
 							},
 							userId

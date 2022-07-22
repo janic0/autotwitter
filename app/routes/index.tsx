@@ -23,23 +23,28 @@ import {
 	startTelegramDeamon,
 } from "../utils/telegram.server";
 
+const compareObjects = (obj1: any, obj2: any) => {
+	return JSON.stringify(obj1) === JSON.stringify(obj2);
+};
+
 export default function Index() {
 	const {
 		scheduledTweets: initialScheduledTweets,
 		userMeta,
-		savedConfig,
+		initialConfig,
 	}: {
 		scheduledTweets: scheduledTweet[];
-		savedConfig: configType;
+		initialConfig: configType;
 		userMeta: userMeta;
 	} = useLoaderData();
-	const [config, setConfig] = useState(savedConfig);
+	const [config, setConfig] = useState(initialConfig);
+	const [savedConfig, setSavedConfig] = useState(initialConfig);
 	const [scheduledTweets, setScheduledTweets] = useState(
 		initialScheduledTweets
 	);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-	useEffect(() => {
+	const updateConfig = () =>
 		fetch("/updateConfig", {
 			method: "POST",
 			headers: {
@@ -50,10 +55,11 @@ export default function Index() {
 				time: { ...config.time, tz: new Date().getTimezoneOffset() },
 			}),
 		}).then((r) => {
-			if (r.status === 200)
+			if (r.status === 200) {
 				r.json().then((data) => setScheduledTweets(data.result));
+				setSavedConfig({ ...config });
+			}
 		});
-	}, [config]);
 
 	return (
 		<div className="w-screen h-screen">
@@ -259,6 +265,16 @@ export default function Index() {
 							</div>
 						)}
 					</div>
+					<button
+						className={`bg-cyan-50 border-primary border-2 text-black rounded transition-all p-2 ${
+							compareObjects(savedConfig, config)
+								? "opacity-0 invisible"
+								: "opacity-100 visible"
+						}`}
+						onClick={updateConfig}
+					>
+						Save and Reschedule
+					</button>
 				</div>
 			</div>
 		</div>
@@ -323,7 +339,7 @@ export const loader = async ({ request }: { request: Request }) => {
 		const config = await getConfig(userId);
 		return json({
 			scheduledTweets,
-			savedConfig: config,
+			initialConfig: config,
 			userMeta,
 		});
 	} else {
