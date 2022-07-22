@@ -90,8 +90,7 @@ const intervalHandler = async () => {
 								{
 									text: "Login",
 									url:
-										"https://example.janic.io" +
-										// secretsServer.URL +
+										secretsServer.URL +
 										"/" +
 										buildSearchParams({
 											telegram_id: telegramId,
