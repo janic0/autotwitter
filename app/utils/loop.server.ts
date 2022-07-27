@@ -23,20 +23,22 @@ const _sendTweet = async (tweet: scheduledTweet, token: string) => {
 			},
 			body: JSON.stringify({ text: tweet.text }),
 		});
-		console.log(await r.json());
+		console.log(r.status, await r.json());
 		set(`scheduled_tweet=${tweet.authorId},${tweet.id}`, {
 			...tweet,
 			sent: r.status === 201,
+			error: r.status !== 201
 		});
 	} catch {
 		console.error("WARNING: FAILED TO SEND TWEET");
+		sentTweetsIds[tweet.id] = false;
 	}
-	sentTweetsIds[tweet.id] = false;
 };
 
 const handleIteration = async () => {
 	const now = new Date().getTime();
-	const scheduledTweets = await getScheduledTweets();
+	const scheduledTweets = (await getScheduledTweets())[0];
+	if (!scheduledTweets) return;
 
 	const tweetsToSendMap: { [key: string]: scheduledTweet[] } =
 		scheduledTweets.reduce((acc, tweet) => {

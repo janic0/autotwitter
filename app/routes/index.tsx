@@ -1,19 +1,16 @@
-import type { LinksFunction, MetaFunction } from "@remix-run/node";
+import type { MetaFunction } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { get, set } from "../utils/redis.server";
-import buildSearchParams from "../utils/params";
+import generateAuthURL from "../utils/generateAuthURL.server";
 
-import { v4 } from "uuid";
-import secretsServer from "../utils/secrets.server";
-import { tokenCookie } from "../utils/cookies";
 import type { FormEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type {
 	scheduledTweet,
-	config as configType,
 	userMeta,
 	frequencyType,
+	serverConfig,
 } from "../utils/types";
 import { getConfig } from "./updateConfig";
 import { getScheduledTweets } from "./schedule";
@@ -22,50 +19,71 @@ import {
 	sendTelegramMessage,
 	startTelegramDeamon,
 } from "../utils/telegram.server";
+import getUser from "../utils/getUser.server";
+import getUserMeta from "../utils/getUserMeta.server";
+
+interface AccountsType {
+	config: serverConfig;
+	details: userMeta;
+	tweets: scheduledTweet[];
+}
 
 export default function Index() {
 	const {
-		scheduledTweets: initialScheduledTweets,
-		userMeta,
-		initialConfig,
+		accounts: initialAccounts,
 	}: {
-		scheduledTweets: scheduledTweet[];
-		initialConfig: configType;
-		userMeta: userMeta;
+		accounts: AccountsType[];
 	} = useLoaderData();
-	const [config, setConfig] = useState(initialConfig);
-	const [savedConfig, setSavedConfig] = useState({
-		...initialConfig,
-		time: { ...initialConfig.time, tz: new Date().getTimezoneOffset() },
-	});
-	const [scheduledTweets, setScheduledTweets] = useState(
-		initialScheduledTweets
-	);
-	const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-	const updateConfig = () =>
+	const [accounts, setAccounts] = useState<AccountsType[]>(initialAccounts);
+
+	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const [activeAccountIndex, setActiveAccountIndex] = useState(0);
+
+	const account = accounts[activeAccountIndex];
+
+	const updateConfig = () => {
+		const newConfig = {
+			...accounts[activeAccountIndex].config,
+			time: {
+				...accounts[activeAccountIndex].config.time,
+				tz: new Date().getTimezoneOffset(),
+			},
+		};
 		fetch("/updateConfig", {
 			method: "POST",
 			headers: {
 				"content-type": "application/json",
 			},
 			body: JSON.stringify({
-				...config,
-				time: { ...config.time, tz: new Date().getTimezoneOffset() },
+				account_id: account.details.id,
+				config: newConfig,
 			}),
 		}).then((r) => {
 			if (r.status === 200) {
-				r.json().then((data) => setScheduledTweets(data.result));
-				setSavedConfig({ ...config });
+				r.json().then((data) =>
+					setAccounts(
+						accounts.map((a, i) => {
+							if (i === activeAccountIndex) {
+								return {
+									...a,
+									tweets: data.result,
+								};
+							}
+							return a;
+						})
+					)
+				);
 			}
 		});
+	};
 
 	return (
 		<div className="w-screen h-screen">
-			<div className="w-full h-full flex flex-col md:flex-row gap-8 ">
+			<div className="w-full h-full flex flex-col md:flex-row gap-8 bg-white dark:bg-slate-900 dark:text-white">
 				<div className="w-full flex flex-col gap-8 xl:p-20 md:p-12 p-8">
 					<form
-						className="flex flex-col md:flex-row gap-8 h-32"
+						className="flex flex-col md:flex-row gap-8"
 						onSubmit={(e: FormEvent) => {
 							e.preventDefault();
 							fetch("/schedule", {
@@ -75,11 +93,22 @@ export default function Index() {
 								},
 								body: JSON.stringify({
 									text: textareaRef.current?.value,
+									account_id: account.details.id,
 								}),
 							}).then((r) => {
 								if (r.status === 200)
 									r.json().then((data) => {
-										setScheduledTweets([...scheduledTweets, data.result]);
+										setAccounts(
+											accounts.map((a, i) => {
+												if (i === activeAccountIndex) {
+													return {
+														...a,
+														tweets: [...a.tweets, data.result],
+													};
+												}
+												return a;
+											})
+										);
 										const textarea = textareaRef.current;
 										if (textarea) textarea.value = "";
 									});
@@ -91,41 +120,56 @@ export default function Index() {
 							ref={textareaRef}
 							required
 							placeholder="Type your tweet"
-							className=" bg-indigo-50 flex-1 w-full outline-none rounded-2xl p-8 resize-none"
+							className=" bg-indigo-50 dark:bg-slate-700 flex-1 h-32 w-full outline-none rounded-2xl p-8 resize-none"
 							maxLength={280}
 						></textarea>
-						<div className="min-h-16 flex flex-col gap-4 rounded-2xl bg-primary-light">
-							<button className="bg-primary rounded-xl h-5/6 hover:h-full w-full transition-all px-4">
+						<div className="h-16 md:h-32 flex flex-col gap-4 rounded-2xl bg-primary-light dark:bg-slate-700">
+							<button className="bg-primary rounded-xl h-5/6 hover:h-full w-full transition-all px-4 dark:text-black text-white">
 								Schedule
 							</button>
 						</div>
 					</form>
 					<div className="h-full overflow-hidden relative">
 						<div className="flex flex-col gap-4 w-full h-full overflow-y-scroll py-8 no-scrollbar">
-							<div className="absolute top-0 bg-gradient-to-b from-white to-transparent h-8 w-full"></div>
-							<div className="absolute bottom-0 bg-gradient-to-t from-white to-transparent h-8 w-full"></div>
-							{scheduledTweets.map((tweet, i: number) => (
+							<div className="absolute top-0 bg-gradient-to-b from-white dark:from-slate-900 to-transparent h-8 w-full"></div>
+							<div className="absolute bottom-0 bg-gradient-to-t from-white dark:from-slate-900 to-transparent h-8 w-full"></div>
+							{account.tweets.map((tweet, i: number) => (
 								<div
 									key={i}
 									className={`p-4 flex flex-col gap-4 border-2 relative rounded-2xl h-fit ${
 										tweet.sent
-											? "border-primary bg-gray-100 cursor-pointer"
-											: "border-gray-100"
+											? "border-primary dark:bg-slate-800 cursor-pointer"
+											: "border-gray-100 dark:border-slate-700"
 									}`}
 								>
 									{!tweet.sent && (
 										<p
-											className="bg-gray-300 absolute rounded-full w-8 h-8 right-0 -top-4 flex justify-center items-center"
+											className="bg-gray-300 absolute text-black rounded-full w-8 h-8 right-0 -top-4 flex justify-center items-center cursor-pointer"
 											onClick={() => {
 												fetch("/delete", {
 													method: "DELETE",
 													headers: {
 														"content-type": "application/json",
 													},
-													body: JSON.stringify({ id: tweet.id }),
+													body: JSON.stringify({
+														id: tweet.id,
+														account_id: account.details.id,
+													}),
 												}).then((r) => {
 													if (r.status === 200)
-														r.json().then((d) => setScheduledTweets(d.result));
+														r.json().then((d) =>
+															setAccounts(
+																accounts.map((a, i) => {
+																	if (i === activeAccountIndex) {
+																		return {
+																			...a,
+																			tweets: d.result,
+																		};
+																	}
+																	return a;
+																})
+															)
+														);
 												});
 											}}
 										>
@@ -135,12 +179,12 @@ export default function Index() {
 									<div className="flex gap-4">
 										<img
 											className="w-12 h-12 rounded-full"
-											src={userMeta.profile_image_url}
-											alt={userMeta.name + "'s Profile Picture"}
+											src={account.details.profile_image_url}
+											alt={account.details.name + "'s Profile Picture"}
 										/>
 										<div className="flex flex-col flex-1">
-											<p className="">{userMeta.name}</p>
-											<p className="opacity-40">@{userMeta.username}</p>
+											<p className="">{account.details.name}</p>
+											<p className="opacity-40">@{account.details.username}</p>
 										</div>
 										<div className="opacity-80 text-right">
 											{tweet.scheduledDate
@@ -154,122 +198,209 @@ export default function Index() {
 						</div>
 					</div>
 				</div>
-				<div className="h-full bg-gray-50 xl:p-20 md:p-12 p-8 md:min-w-96 flex flex-col gap-8">
-					<p className="text-2xl">
-						<strong>Configuration</strong>
-					</p>
-					<p>
-						<strong>Frequency</strong>
-					</p>
-					<div className="flex gap-4 items-center">
-						<input
-							min={0}
-							type="number"
-							className="flex-1 outline-none rounded p-2 w-full"
-							onChange={({ target: { value } }) =>
-								setConfig({
-									...config,
-									frequency: {
-										...config.frequency,
-										value: parseInt(value) | 0,
-									},
-								})
-							}
-							value={config.frequency.value}
-						/>
-						<p className="whitespace-nowrap w-16">
-							time{config.frequency.value === 1 ? "" : "s"} per
+				<div className="h-full pb-32 md:pb-12 justify-between dark:bg-slate-800 bg-gray-50 xl:p-20 md:p-12 p-8 md:min-w-96 max-w-7xl flex flex-col gap-8">
+					<div className="flex flex-col gap-8">
+						<p className="text-2xl">
+							<strong>Configuration</strong>
 						</p>
-						<select
-							value={config.frequency.type}
-							className="flex-1 rounded p-2 w-full"
-							onChange={({ target: { value } }) =>
-								setConfig({
-									...config,
-									frequency: {
-										...config.frequency,
-										type: value as frequencyType,
-									},
-								})
-							}
-						>
-							<option value="hour">hour</option>
-							<option value="day">day</option>
-							<option value="week">week</option>
-						</select>
-					</div>
-					<p>
-						<strong>Time of day</strong>
-					</p>
-					<div className="flex gap-4 items-start">
-						<select
-							value={config.time.type}
-							className="p-2 rounded"
-							onChange={({ target: { value } }) =>
-								setConfig({
-									...config,
-									time: { ...config.time, type: value as "specific" | "range" },
-								})
-							}
-						>
-							<option value="specific">specific</option>
-							<option value="range">range (random)</option>
-						</select>
-						{config.time.type === "specific" && (
+						<p>
+							<strong>Frequency</strong>
+						</p>
+						<div className="flex gap-4 items-center">
 							<input
+								min={0}
+								type="number"
+								className="flex-1 outline-none dark:bg-slate-900 dark:text-white rounded p-2 w-full"
 								onChange={({ target: { value } }) =>
-									setConfig({
-										...config,
-										time: {
-											...config.time,
-											value: [value],
-										},
-									})
+									setAccounts(
+										accounts.map((c, i) => {
+											if (i === activeAccountIndex) {
+												return {
+													...c,
+													config: {
+														...c.config,
+														frequency: {
+															...c.config.frequency,
+															value: parseInt(value) | 0,
+														},
+													},
+												};
+											}
+											return c;
+										})
+									)
 								}
-								value={config.time.value[0]}
-								className="outline-none rounded p-2 w-full"
-								type="time"
+								value={account.config.frequency.value}
 							/>
-						)}
-						{config.time.type === "range" && (
-							<div>
+							<p className="whitespace-nowrap w-16">
+								time{account.config.frequency.value === 1 ? "" : "s"} per
+							</p>
+							<select
+								value={account.config.frequency.type}
+								className="flex-1 dark:bg-slate-900 dark:text-white rounded p-2 w-full"
+								onChange={({ target: { value } }) =>
+									setAccounts(
+										accounts.map((c, i) => {
+											if (i === activeAccountIndex)
+												return {
+													...c,
+													config: {
+														...c.config,
+														frequency: {
+															...c.config.frequency,
+															type: value as frequencyType,
+														},
+													},
+												};
+											return c;
+										})
+									)
+								}
+							>
+								<option value="hour">hour</option>
+								<option value="day">day</option>
+								<option value="week">week</option>
+							</select>
+						</div>
+						<p>
+							<strong>Time of day</strong>
+						</p>
+						<div className="flex gap-4 items-start w-full">
+							<select
+								value={account.config.time.type}
+								className="p-2 rounded dark:bg-slate-900 dark:text-white flex-1"
+								onChange={({ target: { value } }) =>
+									setAccounts(
+										accounts.map((c, i) => {
+											if (activeAccountIndex === i)
+												return {
+													...c,
+													config: {
+														...c.config,
+														time: {
+															...c.config.time,
+															type: value as "specific" | "range",
+														},
+													},
+												};
+											return c;
+										})
+									)
+								}
+							>
+								<option value="specific">specific</option>
+								<option value="range">range (random)</option>
+							</select>
+							{account.config.time.type === "specific" && (
 								<input
 									onChange={({ target: { value } }) =>
-										setConfig({
-											...config,
-											time: {
-												...config.time,
-												value: [value, config.time.value[1]],
-											},
-										})
+										setAccounts(
+											accounts.map((c, i) => {
+												if (activeAccountIndex === i) {
+													return {
+														...c,
+														config: {
+															...c.config,
+															time: {
+																...c.config.time,
+																value: [value],
+															},
+														},
+													};
+												}
+												return c;
+											})
+										)
 									}
-									value={config.time.value[0]}
-									className="outline-none rounded p-2 w-full"
+									value={account.config.time.value[0]}
+									className="outline-none rounded p-2 w-full dark:bg-slate-900 dark:text-white flex-1"
 									type="time"
 								/>
-								<input
-									onChange={({ target: { value } }) =>
-										setConfig({
-											...config,
-											time: {
-												...config.time,
-												value: [config.time.value[0], value],
-											},
-										})
-									}
-									value={config.time.value[1]}
-									className="outline-none rounded p-2 w-full"
-									type="time"
-								/>
-							</div>
-						)}
+							)}
+							{account.config.time.type === "range" && (
+								<div className="flex-1">
+									<input
+										onChange={({ target: { value } }) =>
+											setAccounts(
+												accounts.map((c, i) => {
+													if (activeAccountIndex === i) {
+														return {
+															...c,
+															config: {
+																...c.config,
+																time: {
+																	...c.config.time,
+																	value: [value, c.config.time.value[1]],
+																},
+															},
+														};
+													}
+													return c;
+												})
+											)
+										}
+										value={account.config.time.value[0]}
+										className="outline-none rounded p-2 w-full dark:bg-slate-900 dark:text-white"
+										type="time"
+									/>
+									<input
+										onChange={({ target: { value } }) =>
+											setAccounts(
+												accounts.map((c, i) => {
+													if (activeAccountIndex === i) {
+														return {
+															...c,
+															config: {
+																...c.config,
+																time: {
+																	...c.config.time,
+																	value: [c.config.time.value[0], value],
+																},
+															},
+														};
+													}
+													return c;
+												})
+											)
+										}
+										value={account.config.time.value[1]}
+										className="outline-none rounded p-2 w-full dark:bg-slate-900 dark:text-white"
+										type="time"
+									/>
+								</div>
+							)}
+						</div>
+						<button
+							className="bg-cyan-50 dark:bg-slate-900 dark:text-white border-primary border-2 text-black rounded transition-all p-2"
+							onClick={updateConfig}
+						>
+							Save and Reschedule
+						</button>
 					</div>
-					<button
-						className="bg-cyan-50 border-primary border-2 text-black rounded transition-all p-2"
-						onClick={updateConfig}
-					>
-						Save and Reschedule
-					</button>
+					<div className="flex gap-4">
+						<select
+							value={account.details.id}
+							className="flex-1 dark:bg-slate-900 dark:text-white rounded p-2 w-full"
+							onChange={({ target: { value } }) =>
+								setActiveAccountIndex(
+									accounts.findIndex((account) => account.details.id === value)
+								)
+							}
+						>
+							{accounts.map((account) => {
+								return (
+									<option key={account.details.id} value={account.details.id}>
+										@{account.details.username}
+									</option>
+								);
+							})}
+						</select>
+						<a href="/add-account">
+							<button className="py-2 px-4 rounded dark:bg-slate-900 dark:text-white">
+								+
+							</button>
+						</a>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -280,65 +411,74 @@ export const meta: MetaFunction = () => ({
 	title: "Home | TweetSchedule",
 });
 
-export const generateAuthURL = (
-	config: { telegramChatId?: number | null } = {}
-) => {
-	const [state, challenge] = [v4(), v4()];
-	set("state_challenge=" + state, {
-		challenge,
-		telegramChatId: config.telegramChatId,
+const getAccounts = (userId: string[]): Promise<AccountsType[]> => {
+	return new Promise((res) => {
+		console.time();
+		let userMeta: userMeta[] | null = null;
+		let serverConfig: serverConfig[] | null = null;
+		let scheduledTweets: scheduledTweet[][] | null = null;
+
+		const resolve = () => {
+			if (
+				userMeta !== null &&
+				serverConfig !== null &&
+				scheduledTweets !== null
+			)
+				res(
+					userMeta.map((u, i) => ({
+						config: (serverConfig as serverConfig[])[i],
+						details: u,
+						tweets: (scheduledTweets as scheduledTweet[][])[i],
+					}))
+				);
+		};
+
+		getUserMeta(userId).then((newUserMeta) => {
+			userMeta = newUserMeta;
+			resolve();
+		});
+		getConfig(userId).then((newServerConfig) => {
+			serverConfig = newServerConfig;
+			getScheduledTweets(userId).then((newScheduledTweets) => {
+				scheduledTweets = newScheduledTweets;
+				resolve();
+			});
+		});
 	});
-	return (
-		"https://twitter.com" +
-		"/i/oauth2/authorize" +
-		buildSearchParams({
-			response_type: "code",
-			client_id: secretsServer.CLIENT_ID,
-			redirect_uri: secretsServer.URL + "/tw/authorize",
-			scope: "tweet.read tweet.write users.read offline.access",
-			state,
-			code_challenge: challenge,
-			code_challenge_method: "plain",
-		})
-	);
 };
 
 export const loader = async ({ request }: { request: Request }) => {
-	const userId = await tokenCookie.parse(request.headers.get("cookie"));
+	const userIds = await getUser(request);
 
 	startLoop();
 	startTelegramDeamon();
 
 	const url = new URL(request.url);
-	if (userId) {
+	if (userIds) {
 		if (url.searchParams.has("telegram_id"))
 			(async () => {
 				const chatId = await get(
 					"telegram_id=" + url.searchParams.get("telegram_id")
 				);
 				if (chatId) {
-					const notificationMethods =
-						(await get("notificationMethods=" + userId)) || {};
-					if (notificationMethods.telegram !== chatId) {
-						sendTelegramMessage(chatId, "Account linked.");
-					}
-					set("notificationMethods=" + userId, {
-						...notificationMethods,
-						telegram: chatId,
+					const accounts = await getUserMeta(userIds);
+					accounts.forEach(async (account) => {
+						const notificationMethods =
+							(await get("notificationMethods=" + account.id)) || {};
+						set("notificationMethods=" + account.id, {
+							...notificationMethods,
+							telegram: chatId,
+						});
+						if (notificationMethods.telegram !== chatId)
+							sendTelegramMessage(
+								chatId,
+								`Account linked. (@${account.username})`
+							);
 					});
 				}
 			})();
-
-		const userMeta: userMeta = await get("userMeta=" + userId);
-		const config = await getConfig(userId);
-		const scheduledTweets: scheduledTweet[] = await getScheduledTweets(
-			userId,
-			config
-		);
 		return json({
-			scheduledTweets,
-			initialConfig: config,
-			userMeta,
+			accounts: await getAccounts(userIds),
 		});
 	} else {
 		let telegramChatId: number | null = null;

@@ -1,24 +1,17 @@
-import {
-	createCookie,
-	json,
-	LoaderFunction,
-	MetaFunction,
-	redirect,
-} from "@remix-run/node";
-import { Meta, useLoaderData } from "@remix-run/react";
-import { v4 } from "uuid";
+import type { MetaFunction } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
 import { tokenCookie } from "../../utils/cookies";
 import buildSearchParams from "../../utils/params";
 import { get, set } from "../../utils/redis.server";
 import secretsServer, { appAuth } from "../../utils/secrets.server";
 import { sendTelegramMessage } from "../../utils/telegram.server";
-import { userMeta } from "../../utils/types";
-import { _resetConfig, _updateConfig } from "../updateConfig";
+import type { userMeta } from "../../utils/types";
 
 const Authorize = () => {
 	const { name, profilePictureURL } = useLoaderData();
 	return (
-		<div className="w-screen h-screen flex justify-center items-center flex-col">
+		<div className="w-screen h-screen flex justify-center items-center flex-col dark:text-white">
 			<div className="flex gap-8 items-center">
 				<img
 					className="rounded-full w-16 h-16 flex-1"
@@ -122,6 +115,10 @@ const loader = async ({ request }: { request: Request }) => {
 		accessTokenValidUntil: new Date().getTime() + jsonResp.expires_in * 1000,
 	});
 
+	let serializedUserId = userId;
+	if (challengeResult.userIds && !challengeResult.userIds.includes(userId))
+		serializedUserId = [...challengeResult.userIds, userId].join(",");
+
 	return json(
 		{
 			name: data.data.name,
@@ -129,7 +126,7 @@ const loader = async ({ request }: { request: Request }) => {
 		},
 		{
 			headers: {
-				"set-cookie": await tokenCookie.serialize(userId),
+				"set-cookie": await tokenCookie.serialize(serializedUserId),
 			},
 		}
 	);

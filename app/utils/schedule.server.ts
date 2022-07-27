@@ -1,12 +1,7 @@
-import { getScheduledTweets } from "../routes/schedule";
-import { getConfig } from "../routes/updateConfig";
-import { get, set } from "./redis.server";
-import type {
-	config,
-	frequencyType,
-	scheduledTweet,
-	serverConfig,
-} from "./types";
+import { getTweetsForUser } from "../routes/schedule";
+import { getSingleConfig } from "../routes/updateConfig";
+import { set } from "./redis.server";
+import type { frequencyType, scheduledTweet, serverConfig } from "./types";
 
 const PERIODS = {
 	second: 1000,
@@ -66,8 +61,8 @@ export async function scheduleTweet(
 	tweet: scheduledTweet,
 	userId: string
 ): Promise<scheduledTweet> {
-	const userConfig = await getConfig(userId);
-	const allTweets: scheduledTweet[] = await getScheduledTweets(
+	const userConfig = await getSingleConfig(userId);
+	const allTweets: scheduledTweet[] = await getTweetsForUser(
 		userId,
 		userConfig
 	);
@@ -231,8 +226,8 @@ export async function checkFulfillment(
 	expectation: number;
 	reality: number;
 }> {
-	const userConfig = await getConfig(userId);
-	const scheduledTweets = await getScheduledTweets(userId, userConfig);
+	const userConfig = await getSingleConfig(userId);
+	const scheduledTweets = await getTweetsForUser(userId);
 
 	const period = new PeriodManager(userConfig.frequency.type);
 
@@ -257,11 +252,11 @@ export async function rescheduleAll(
 ): Promise<scheduledTweet[]> {
 	const allTweets: scheduledTweet[] = inputTweets
 		? inputTweets
-		: await getScheduledTweets(userId, config);
+		: await getTweetsForUser(userId);
 
 	if (!allTweets.length) return [];
 
-	const userConfig = config ? config : await getConfig(userId);
+	const userConfig = config ? config : await getSingleConfig(userId);
 
 	if (userConfig.frequency.value === 0) {
 		const newTweets = allTweets.map((tweet) => ({

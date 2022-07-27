@@ -1,11 +1,11 @@
 import { json } from "@remix-run/node";
-import { tokenCookie } from "../utils/cookies";
+import getUser from "../utils/getUser.server";
 import { get, set } from "../utils/redis.server";
 import { rescheduleAll } from "../utils/schedule.server";
 import type { config, serverConfig } from "../utils/types";
 
 const action = async ({ request }: { request: Request }) => {
-	const auth = await tokenCookie.parse(request.headers.get("cookie"));
+	const auth = await getUser(request);
 	if (!auth)
 		return json(
 			{ ok: false, error: "No or invalid Authentication" },
@@ -24,7 +24,32 @@ const action = async ({ request }: { request: Request }) => {
 			}
 		);
 	}
-	const scheduledTweets = await _updateConfig(body, auth);
+
+	if (
+		typeof body !== "object" ||
+		!body ||
+		Array.isArray(body) ||
+		typeof body.config !== "object" ||
+		!body.config ||
+		typeof body.account_id !== "string"
+	)
+		return json(
+			{ ok: false, error: "Invalid request" },
+			{
+				status: 400,
+			}
+		);
+
+	if (!auth.includes(body.account_id))
+		return json(
+			{ ok: false, error: "Foreign account" },
+			{
+				status: 403,
+			}
+		);
+
+	console.log(body.config);
+	const scheduledTweets = await _updateConfig(body.config, body.account_id);
 	if (scheduledTweets)
 		return json({
 			ok: true,
@@ -122,11 +147,41 @@ const _updateConfig = (body: config, userId: string) => {
 	return false;
 };
 
-export const getConfig = async (userId: string): Promise<serverConfig> => {
-	const data = await get("userConfig=" + userId);
-	if (!data) return _resetConfig(userId);
-	return data;
+interface serverConfigIndex {
+	user_id: string;
+	config: serverConfig;
+}
+
+export const getSingleConfig = async (
+	userId: string
+): Promise<serverConfig> => {
+	return (await get("userConfig=" + userId)) || _resetConfig(userId);
 };
+
+export const getConfig = async (
+	userIds: string | string[]
+): Promise<serverConfig[]> =>
+	new Promise(async (res) => {
+		if (typeof userIds === "string")
+			res([(await get("userConfig=" + userIds)) || _resetConfig(userIds)]);
+		else {
+			if (userIds.length === 0) res([]);
+			const result: serverConfigIndex[] = [];
+
+			userIds.forEach(async (userId) => {
+				result.push({
+					user_id: userId,
+					config: (await get("userConfig=" + userId)) || _resetConfig(userId),
+				});
+				if (result.length === userIds.length)
+					res(
+						result
+							.sort((a, b) => a.user_id.localeCompare(b.user_id))
+							.map((r) => r.config)
+					);
+			});
+		}
+	});
 
 const loader = () => {
 	return json(

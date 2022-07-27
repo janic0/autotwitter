@@ -1,9 +1,9 @@
 import { json } from "@remix-run/node";
 import { v4 } from "uuid";
-import { tokenCookie } from "../utils/cookies";
+import getUser from "../utils/getUser.server";
 import { client, get, set } from "../utils/redis.server";
 import { PeriodManager, scheduleTweet } from "../utils/schedule.server";
-import { scheduledTweet, serverConfig } from "../utils/types";
+import type { scheduledTweet, serverConfig } from "../utils/types";
 import { getConfig } from "./updateConfig";
 
 export const handler = () => {
@@ -16,7 +16,7 @@ export const handler = () => {
 };
 
 export const action = async ({ request }: { request: Request }) => {
-	const userId = await tokenCookie.parse(request.headers.get("cookie"));
+	const userId = await getUser(request);
 	if (!userId)
 		return json(
 			{ ok: false, error: "No or invalid Authentication" },
@@ -34,6 +34,8 @@ export const action = async ({ request }: { request: Request }) => {
 		typeof body === "object" &&
 		!Array.isArray(body) &&
 		typeof body.text === "string" &&
+		typeof body.account_id === "string" &&
+		userId.includes(body.account_id) &&
 		body.text.length
 	) {
 		const tweet = await scheduleTweet(
@@ -43,10 +45,10 @@ export const action = async ({ request }: { request: Request }) => {
 				sent: false,
 				scheduledDate: null,
 				random_offset: Math.random(),
-				authorId: userId,
+				authorId: body.account_id,
 				created_at: Date.now(),
 			},
-			userId
+			body.account_id
 		);
 		return json({
 			ok: true,
@@ -60,15 +62,15 @@ export const action = async ({ request }: { request: Request }) => {
 	return json({ ok: false, error: "invalid body" }, { status: 400 });
 };
 
-export const getScheduledTweets = (
+export const getTweetsForUser = (
 	userId?: string,
 	userConfig?: serverConfig
 ): Promise<scheduledTweet[]> => {
 	return new Promise((res) => {
+		const values: scheduledTweet[] = [];
 		const cb = (period?: PeriodManager) => {
 			client.keys(`scheduled_tweet=${userId || "*"},*`).then((keys) => {
 				if (!keys.length) return res([]);
-				const values: scheduledTweet[] = [];
 				keys.forEach(async (key) => {
 					const value = await get(key);
 					values.push(value);
@@ -91,8 +93,39 @@ export const getScheduledTweets = (
 			if (userConfig) cb(new PeriodManager(userConfig.frequency.type));
 			else
 				getConfig(userId).then((config) =>
-					cb(new PeriodManager(config.frequency.type))
+					cb(new PeriodManager(config[0].frequency.type))
 				);
 		} else cb();
+	});
+};
+
+interface wrappedResult {
+	userId: string;
+	tweets: scheduledTweet[];
+}
+
+export const getScheduledTweets = (
+	userIds?: string[] | string,
+	userConfigs?: serverConfig[]
+): Promise<scheduledTweet[][]> => {
+	return new Promise(async (res) => {
+		if (!userIds || typeof userIds === "string" || userIds.length <= 1)
+			return res([
+				await getTweetsForUser(
+					userIds ? userIds[0] : undefined,
+					userConfigs ? userConfigs[0] : undefined
+				),
+			]);
+		const result: wrappedResult[] = [];
+		userIds.forEach(async (userId, i) => {
+			const tweets = await getTweetsForUser(userId, userConfigs?.[i]);
+			result.push({ userId, tweets });
+			if (result.length === userIds.length)
+				res(
+					result
+						.sort((a, b) => a.userId.localeCompare(b.userId))
+						.map((r) => r.tweets)
+				);
+		});
 	});
 };
