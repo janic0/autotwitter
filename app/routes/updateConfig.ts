@@ -1,6 +1,6 @@
 import { json } from "@remix-run/node";
 import getUser from "../utils/getUser.server";
-import { get, set } from "../utils/redis.server";
+import { del, get, set } from "../utils/redis.server";
 import { rescheduleAll } from "../utils/schedule.server";
 import type { config, serverConfig } from "../utils/types";
 
@@ -48,7 +48,6 @@ const action = async ({ request }: { request: Request }) => {
 			}
 		);
 
-	console.log(body.config);
 	const scheduledTweets = await _updateConfig(body.config, body.account_id);
 	if (scheduledTweets)
 		return json({
@@ -83,6 +82,7 @@ const _resetConfig = (userId: string) => {
 			],
 			tz: 0,
 		},
+		allowTelegramResponses: false,
 	};
 	_updateConfig(defaultConfig, userId);
 	return defaultConfig;
@@ -122,7 +122,9 @@ const _updateConfig = (body: config, userId: string) => {
 					return true;
 				})(),
 			true
-		)
+		) &&
+		(typeof body.allowTelegramResponses === "boolean" ||
+			body.allowTelegramResponses === undefined)
 	) {
 		const newConfig = {
 			frequency: {
@@ -140,7 +142,9 @@ const _updateConfig = (body: config, userId: string) => {
 						minute: parseInt(timeString?.slice(3, 5)!),
 					})),
 			},
+			allowTelegramResponses: !!body.allowTelegramResponses,
 		};
+		if (!newConfig.allowTelegramResponses) del(`last_mention_id=${userId}`);
 		set("userConfig=" + userId, newConfig);
 		return rescheduleAll(userId, newConfig);
 	}

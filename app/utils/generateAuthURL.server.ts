@@ -7,11 +7,15 @@ export default (
 	config: { telegramChatId?: number | null; userIds?: string[] } = {}
 ) => {
 	const [state, challenge] = [v4(), v4()];
-	set("state_challenge=" + state, {
-		challenge,
-		telegramChatId: config.telegramChatId,
-		userIds: config.userIds,
-	});
+	set(
+		"state_challenge=" + state,
+		{
+			challenge,
+			telegramChatId: config.telegramChatId,
+			userIds: config.userIds,
+		},
+		true
+	);
 	return (
 		"https://twitter.com" +
 		"/i/oauth2/authorize" +

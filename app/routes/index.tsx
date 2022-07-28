@@ -370,6 +370,35 @@ export default function Index() {
 								</div>
 							)}
 						</div>
+						<div className="flex justify-between w-full">
+							<strong>Answer via Telegram</strong>
+							<div
+								className="h-full dark:bg-slate-900  bg-white relative rounded-2xl w-16 cursor-pointer group"
+								onClick={() => {
+									setAccounts(
+										accounts.map((c, i) => {
+											if (activeAccountIndex === i) {
+												return {
+													...c,
+													config: {
+														...c.config,
+														allowTelegramResponses:
+															!c.config.allowTelegramResponses,
+													},
+												};
+											}
+											return c;
+										})
+									);
+								}}
+							>
+								<div
+									className={`rounded-full bg-primary absolute top-2 bottom-2 left-2 group-hover:top-1.5 group-hover:bottom-1.5 transition-all ${
+										account.config.allowTelegramResponses ? "w-12" : "w-4"
+									}`}
+								/>
+							</div>
+						</div>
 						<button
 							className="bg-cyan-50 dark:bg-slate-900 dark:text-white border-primary border-2 text-black rounded transition-all p-2"
 							onClick={updateConfig}
@@ -413,7 +442,6 @@ export const meta: MetaFunction = () => ({
 
 const getAccounts = (userId: string[]): Promise<AccountsType[]> => {
 	return new Promise((res) => {
-		console.time();
 		let userMeta: userMeta[] | null = null;
 		let serverConfig: serverConfig[] | null = null;
 		let scheduledTweets: scheduledTweet[][] | null = null;

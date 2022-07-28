@@ -18,8 +18,7 @@ const ensureClientOpen = () => {
 const get = async (key: string) => {
 	if (!key) return console.trace("WARNING: Redis GET called without key");
 	await ensureClientOpen();
-	if (cache[key] || cache[key] === null) return cache[key];
-
+	if (typeof cache[key] !== "undefined") return cache[key];
 	const value = await client.get(key);
 	if (!value) {
 		cache[key] = null;
@@ -38,13 +37,15 @@ const del = async (key: string) => {
 	return client.del(key);
 };
 
-const set = async (key: string, value: any) => {
+const set = async (key: string, value: any, expires = false) => {
 	if (!key) return console.trace("WARNING: SET called without key");
 	if (!value) return console.trace("WARNING: SET called without value");
 	const encoded = JSON.stringify(value);
 	await ensureClientOpen();
 	cache[key] = value;
-	return client.set(key, encoded || "");
+	return client.set(key, encoded || "", {
+		EX: expires ? 60 * 60 * 24 * 7 : undefined,
+	});
 };
 
 export { get, set, del, client };

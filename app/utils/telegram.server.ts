@@ -1,26 +1,33 @@
 import { v4 } from "uuid";
 import { getSingleConfig } from "../routes/updateConfig";
+import { sendTweetQueryItem } from "./generateTweetGraph.server";
 import getUserMeta, { getSingleUserMeta } from "./getUserMeta.server";
+import { replyQueue, telegramLock, _replyToTweet } from "./loop.server";
 import buildSearchParams from "./params";
 import { client, del, get, set } from "./redis.server";
 import { scheduleTweet } from "./schedule.server";
 import secretsServer from "./secrets.server";
+import getToken from "./tw/getToken.server";
+import type { replyQueueItem } from "./types";
 
 let hasStarted = false;
 let offset = 0;
 
-interface result {
-	message?: {
-		chat: {
-			id: number;
-		};
-		text?: string;
+interface message {
+	chat: {
+		id: number;
 	};
+	text?: string;
+}
+
+interface result {
+	message?: message;
 	callback_query?: {
 		data: string;
 		from: {
 			id: number;
 		};
+		message?: message;
 	};
 }
 
@@ -32,10 +39,10 @@ export const sendTelegramMessage = async (
 	} = {
 		inline_keyboard: [],
 	}
-) => {
-	if (!secretsServer.TELEGRAM_TOKEN) return;
+): Promise<false | number> => {
+	if (!secretsServer.TELEGRAM_TOKEN) return false;
 	try {
-		return await fetch(
+		const r = await fetch(
 			`https://api.telegram.org/bot${secretsServer.TELEGRAM_TOKEN}/sendMessage`,
 			{
 				method: "POST",
@@ -49,8 +56,12 @@ export const sendTelegramMessage = async (
 				}),
 			}
 		);
+		if (!r.ok) return false;
+		const data = await r.json();
+		if (!data.ok) return false;
+		return data?.result?.message_id;
 	} catch {
-		return null;
+		return false;
 	}
 };
 export const editTelegramMessage = async (
@@ -62,10 +73,10 @@ export const editTelegramMessage = async (
 	} = {
 		inline_keyboard: [],
 	}
-) => {
-	if (!secretsServer.TELEGRAM_TOKEN) return;
+): Promise<false | number> => {
+	if (!secretsServer.TELEGRAM_TOKEN) return false;
 	try {
-		return await fetch(
+		const r = await fetch(
 			`https://api.telegram.org/bot${secretsServer.TELEGRAM_TOKEN}/editMessageText`,
 			{
 				method: "POST",
@@ -80,8 +91,12 @@ export const editTelegramMessage = async (
 				}),
 			}
 		);
+		if (!r.ok) return false;
+		const data = await r.json();
+		if (!data.ok) return false;
+		return data?.result?.message_id;
 	} catch {
-		return null;
+		return false;
 	}
 };
 
@@ -200,7 +215,42 @@ const intervalHandler = async () => {
 					const accountIds = await getAccountsWithTelegramID(
 						message.message.chat.id
 					);
+					const lock = await telegramLock.get(message.message.chat.id);
 
+					if (lock) {
+						const config = await getSingleConfig(lock.account_id);
+						if (
+							config.allowTelegramResponses &&
+							accountIds.includes(lock.account_id)
+						) {
+							if (message.message.text.length > 280)
+								return sendTelegramMessage(
+									message.message.chat.id,
+									"Message too long. Please try again."
+								);
+							const token = await getToken(lock.account_id);
+							if (token) {
+								_replyToTweet(
+									lock.reply_queue_item.tweet.id,
+									message.message.text,
+									token
+								);
+								const updatedItem: replyQueueItem = {
+									...lock.reply_queue_item,
+									answer: {
+										text: message.message.text,
+									},
+								};
+								replyQueue.add(updatedItem);
+								sendTweetQueryItem(updatedItem, lock.chat_id, lock.message_id);
+								const queueItems = await replyQueue.get(lock.chat_id);
+								if (queueItems.length === 0) telegramLock.clear(lock.chat_id);
+								else sendTweetQueryItem(queueItems[0], lock.chat_id);
+							} else
+								sendTelegramMessage(lock.chat_id, "Failed to send response.");
+							return;
+						} else telegramLock.clear(lock.chat_id);
+					}
 					if (accountIds.length === 0)
 						return sendTelegramMessage(
 							message.message.chat.id,
@@ -274,14 +324,11 @@ const intervalHandler = async () => {
 								],
 							}
 						).then((r) => {
-							if (!r || r.status > 299) return;
-							r.json().then((d) => {
-								if (!d.ok) return;
-								set("telegram_draft=" + draftId, {
-									text: message.message!.text,
-									message_id: d.result.message_id,
-									chat_id: message.message!.chat.id,
-								});
+							if (!r) return;
+							set("telegram_draft=" + draftId, {
+								text: message.message!.text,
+								message_id: r,
+								chat_id: message.message!.chat.id,
 							});
 						});
 					}
@@ -290,6 +337,35 @@ const intervalHandler = async () => {
 				message.callback_query &&
 				typeof message.callback_query.data === "string"
 			) {
+				// if (message.callback_query.data === "like_queue_item") {
+				// 	const lock = await telegramLock.get(message.callback_query.from.id);
+				// 	if (lock && lock.reply_queue_item) {
+				// 		// do liking
+
+				// 		sendTweetQueryItem(
+				// 			{ ...lock.reply_queue_item, liked: !lock.reply_queue_item.liked },
+				// 			message.callback_query.from.id,
+				// 			message.callback_query?.message?.chat?.id
+				// 		);
+				// 	}
+				// }
+				if (message.callback_query.data === "skip_queue_item") {
+					const lock = await telegramLock.get(message.callback_query.from.id);
+					if (lock && lock.reply_queue_item) {
+						const updatedItem: replyQueueItem = {
+							...lock.reply_queue_item,
+							answer: {
+								text: "",
+							},
+						};
+						replyQueue.add(updatedItem);
+						sendTweetQueryItem(updatedItem, lock.chat_id, lock.message_id);
+
+						const queueItems = await replyQueue.get(lock.chat_id);
+						if (queueItems.length === 0) telegramLock.clear(lock.chat_id);
+						else sendTweetQueryItem(queueItems[0], lock.chat_id);
+					}
+				}
 				if (message.callback_query.data.startsWith("draft_id=")) {
 					const parts = message.callback_query.data.split("=");
 					if (parts.length !== 3) return;

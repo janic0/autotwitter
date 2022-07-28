@@ -1,16 +1,3 @@
-export interface tweet {
-	id: string;
-	author_id: string;
-	created_at: string;
-	text: string;
-	author: {
-		id: string;
-		username: string;
-		name: string;
-		profile_image_url: string;
-	};
-}
-
 export type frequencyType = "hour" | "day" | "week";
 
 export interface scheduledTweet {
@@ -33,6 +20,7 @@ export interface config {
 		value: [string, string?];
 		tz: number;
 	};
+	allowTelegramResponses?: boolean;
 }
 
 export interface serverConfig extends config {
@@ -59,4 +47,38 @@ export interface authData {
 	accessToken: string;
 	refreshToken: string;
 	accessTokenValidUntil: number;
+}
+
+export interface tweetAuthor {
+	id: string;
+	name: string;
+	username: string;
+}
+
+export interface tweet {
+	id: string;
+	text: string;
+	author?: tweetAuthor;
+	replied_to?: {
+		id: string;
+		text: string;
+		author?: tweetAuthor;
+	};
+}
+
+export interface replyQueueItem {
+	tweet: tweet;
+	answer?: {
+		text: string;
+	};
+	chat_id: number;
+	account_id: string;
+	liked: boolean;
+	reported_at: number;
+}
+export interface TelegramMessageLock {
+	reply_queue_item: replyQueueItem;
+	chat_id: number;
+	message_id: number;
+	account_id: string;
 }
