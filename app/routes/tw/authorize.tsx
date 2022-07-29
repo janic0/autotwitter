@@ -5,7 +5,7 @@ import { tokenCookie } from "../../utils/cookies";
 import buildSearchParams from "../../utils/params";
 import { get, set } from "../../utils/redis.server";
 import secretsServer, { appAuth } from "../../utils/secrets.server";
-import { sendTelegramMessage } from "../../utils/telegram.server";
+import { sendTelegramMessage } from "../../utils/telegram.actions.server";
 import type { userMeta } from "../../utils/types";
 
 const Authorize = () => {

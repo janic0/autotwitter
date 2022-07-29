@@ -6,6 +6,9 @@ interface ReferencedTweet {
 interface Datum {
 	id: string;
 	referenced_tweets: ReferencedTweet[];
+	attachments?: {
+		media_keys?: string[];
+	};
 	text: string;
 	author_id: string;
 }
@@ -28,9 +31,16 @@ interface Tweet {
 	author_id: string;
 }
 
+interface MediaIncludes {
+	media_key: string;
+	type: string;
+	url: string;
+}
+
 interface Includes {
 	users: User[];
 	tweets: Tweet[];
+	media: MediaIncludes[];
 }
 
 interface Error {

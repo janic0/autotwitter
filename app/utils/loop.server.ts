@@ -6,7 +6,7 @@ import buildSearchParams from "./params";
 import { client, del, get, set } from "./redis.server";
 import { checkFulfillment } from "./schedule.server";
 import secretsServer from "./secrets.server";
-import { sendTelegramMessage } from "./telegram.server";
+import { sendTelegramMessage } from "./telegram.actions.server";
 import getToken from "./tw/getToken.server";
 import type {
 	replyQueueItem,
@@ -34,6 +34,7 @@ const _getMentioningTweets = async (
 					"referenced_tweets.id",
 					"referenced_tweets.id.author_id",
 					"author_id",
+					"attachments.media_keys",
 				].join(","),
 				"media.fields": ["type", "url"].join(","),
 				"tweet.fields": ["id", "text"].join(","),
@@ -58,14 +59,26 @@ const _getMentioningTweets = async (
 		) {
 			set("last_mention_id=" + userId, data?.meta.newest_id);
 			if (!since_id) return [];
-			const authorMap = data.includes.users.reduce(
+			const authorMap = data.includes?.users?.reduce(
 				(acc, user) => ({ ...acc, [user.id]: user }),
 				{} as { [key: string]: tweetAuthor }
 			);
-			const referencedTweetsMap = data.includes.tweets.reduce(
+			const referencedTweetsMap = data.includes?.tweets?.reduce(
 				(acc, tweet) => ({ ...acc, [tweet.id]: tweet }),
 				{} as { [key: string]: { text: string; id: string; author_id: string } }
 			);
+
+			const mediaKeysMap = data.includes?.media?.reduce(
+				(acc, media) => ({ ...acc, [media.media_key]: media }),
+				{} as {
+					[key: string]: {
+						media_key: string;
+						url: string;
+						type: string;
+					};
+				}
+			);
+
 			return data.data.map(
 				(tweet): tweet => ({
 					...tweet,
@@ -77,11 +90,15 @@ const _getMentioningTweets = async (
 								referencedTweetsMap[tweet.referenced_tweets[0]?.id]?.author_id
 							],
 					},
+					media: tweet.attachments?.media_keys
+						?.map((key) => mediaKeysMap[key])
+						?.filter((m) => m),
 				})
 			) as tweet[];
 		}
 		return false;
-	} catch {
+	} catch (e) {
+		console.trace(e);
 		return false;
 	}
 };
@@ -229,6 +246,19 @@ export const replyQueue = {
 
 	remove: (chat_id: number, tweet_id: string) =>
 		client.del(`reply_queue_item=${chat_id}=${tweet_id}`),
+
+	modify: (item: replyQueueItem, message_id: number) => {
+		set(`reply_queue_item=${item.chat_id}=${item.tweet.id}`, item);
+		sendTweetQueryItem(item, item.chat_id, message_id);
+	},
+	nextItem: async (chat_id: number) => {
+		const replyQueueItems = await replyQueue.get(chat_id);
+		console.log(replyQueueItems);
+		if (replyQueueItems.length) {
+			const targetReplyItem = replyQueueItems[0];
+			sendTweetQueryItem(targetReplyItem, chat_id);
+		} else telegramLock.clear(chat_id);
+	},
 };
 
 export const telegramLock = {
@@ -263,14 +293,9 @@ const telegramResponderIteration = async () => {
 							replyQueue.add(replyQueueItem);
 						});
 						const lock = await telegramLock.get(notificationMethods.telegram);
+						console.log(lock);
 						if (lock) return;
-						const replyQueueItems = await replyQueue.get(
-							notificationMethods.telegram
-						);
-						if (replyQueueItems.length) {
-							const targetReplyItem = replyQueueItems[0];
-							sendTweetQueryItem(targetReplyItem, notificationMethods.telegram);
-						}
+						replyQueue.nextItem(notificationMethods.telegram);
 					});
 			}
 		}

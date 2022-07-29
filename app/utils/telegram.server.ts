@@ -1,6 +1,5 @@
 import { v4 } from "uuid";
 import { getSingleConfig } from "../routes/updateConfig";
-import { sendTweetQueryItem } from "./generateTweetGraph.server";
 import getUserMeta, { getSingleUserMeta } from "./getUserMeta.server";
 import { replyQueue, telegramLock, _replyToTweet } from "./loop.server";
 import buildSearchParams from "./params";
@@ -9,123 +8,13 @@ import { scheduleTweet } from "./schedule.server";
 import secretsServer from "./secrets.server";
 import getToken from "./tw/getToken.server";
 import type { replyQueueItem } from "./types";
+import {
+	editTelegramMessage,
+	sendTelegramMessage,
+	_getMessages,
+} from "./telegram.actions.server";
 
 let hasStarted = false;
-let offset = 0;
-
-interface message {
-	chat: {
-		id: number;
-	};
-	text?: string;
-}
-
-interface result {
-	message?: message;
-	callback_query?: {
-		data: string;
-		from: {
-			id: number;
-		};
-		message?: message;
-	};
-}
-
-export const sendTelegramMessage = async (
-	chat_id: number,
-	text: string,
-	reply_markup: {
-		inline_keyboard: { text: string; url?: string; callback_data?: string }[][];
-	} = {
-		inline_keyboard: [],
-	}
-): Promise<false | number> => {
-	if (!secretsServer.TELEGRAM_TOKEN) return false;
-	try {
-		const r = await fetch(
-			`https://api.telegram.org/bot${secretsServer.TELEGRAM_TOKEN}/sendMessage`,
-			{
-				method: "POST",
-				headers: {
-					"content-type": "application/json",
-				},
-				body: JSON.stringify({
-					chat_id,
-					text,
-					reply_markup,
-				}),
-			}
-		);
-		if (!r.ok) return false;
-		const data = await r.json();
-		if (!data.ok) return false;
-		return data?.result?.message_id;
-	} catch {
-		return false;
-	}
-};
-export const editTelegramMessage = async (
-	chat_id: number,
-	message_id: number,
-	text: string,
-	reply_markup: {
-		inline_keyboard: { text: string; url?: string; callback_data?: string }[][];
-	} = {
-		inline_keyboard: [],
-	}
-): Promise<false | number> => {
-	if (!secretsServer.TELEGRAM_TOKEN) return false;
-	try {
-		const r = await fetch(
-			`https://api.telegram.org/bot${secretsServer.TELEGRAM_TOKEN}/editMessageText`,
-			{
-				method: "POST",
-				headers: {
-					"content-type": "application/json",
-				},
-				body: JSON.stringify({
-					chat_id,
-					message_id,
-					text,
-					reply_markup,
-				}),
-			}
-		);
-		if (!r.ok) return false;
-		const data = await r.json();
-		if (!data.ok) return false;
-		return data?.result?.message_id;
-	} catch {
-		return false;
-	}
-};
-
-const _getMessages = async (): Promise<result[] | null> => {
-	try {
-		const response = await fetch(
-			`https://api.telegram.org/bot${secretsServer.TELEGRAM_TOKEN}/getUpdates${
-				offset
-					? buildSearchParams({
-							offset,
-					  })
-					: ""
-			}`
-		);
-		const data = await response.json();
-		console.log(data);
-		if (!response.ok) return null;
-
-		if (data.ok) {
-			const { result } = data;
-			if (result.length) offset = result[result.length - 1].update_id + 1;
-			else offset = 0;
-
-			return result;
-		} else return null;
-	} catch {
-		return null;
-	}
-};
 
 const getAccountsWithTelegramID = (telegramId: number): Promise<string[]> => {
 	return new Promise(async (res) => {
@@ -238,11 +127,8 @@ const intervalHandler = async () => {
 										text: message.message.text,
 									},
 								};
-								replyQueue.add(updatedItem);
-								sendTweetQueryItem(updatedItem, lock.chat_id, lock.message_id);
-								const queueItems = await replyQueue.get(lock.chat_id);
-								if (queueItems.length === 0) telegramLock.clear(lock.chat_id);
-								else sendTweetQueryItem(queueItems[0], lock.chat_id);
+								replyQueue.modify(updatedItem, lock.message_id);
+								replyQueue.nextItem(lock.chat_id);
 							} else
 								sendTelegramMessage(lock.chat_id, "Failed to send response.");
 							return;
@@ -355,12 +241,9 @@ const intervalHandler = async () => {
 								text: "",
 							},
 						};
-						replyQueue.add(updatedItem);
-						sendTweetQueryItem(updatedItem, lock.chat_id, lock.message_id);
 
-						const queueItems = await replyQueue.get(lock.chat_id);
-						if (queueItems.length === 0) telegramLock.clear(lock.chat_id);
-						else sendTweetQueryItem(queueItems[0], lock.chat_id);
+						replyQueue.modify(updatedItem, lock.message_id);
+						replyQueue.nextItem(lock.chat_id);
 					}
 				}
 				if (message.callback_query.data.startsWith("draft_id=")) {
@@ -455,7 +338,6 @@ const startTelegramDeamon = async () => {
 		return console.error("Warning: No Telegram API Token provided");
 	if (hasStarted) return;
 	hasStarted = true;
-	offset = (await get("telegram_offset")) || 0;
 	intervalHandler();
 };
 

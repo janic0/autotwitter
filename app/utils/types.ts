@@ -64,6 +64,10 @@ export interface tweet {
 		text: string;
 		author?: tweetAuthor;
 	};
+	media?: {
+		type: string;
+		url: string;
+	}[];
 }
 
 export interface replyQueueItem {

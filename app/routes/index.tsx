@@ -15,10 +15,8 @@ import type {
 import { getConfig } from "./updateConfig";
 import { getScheduledTweets } from "./schedule";
 import startLoop from "../utils/loop.server";
-import {
-	sendTelegramMessage,
-	startTelegramDeamon,
-} from "../utils/telegram.server";
+import { startTelegramDeamon } from "../utils/telegram.server";
+import { sendTelegramMessage } from "../utils/telegram.actions.server";
 import getUser from "../utils/getUser.server";
 import getUserMeta from "../utils/getUserMeta.server";
 

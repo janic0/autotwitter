@@ -1,5 +1,11 @@
 import { telegramLock } from "./loop.server";
-import { editTelegramMessage, sendTelegramMessage } from "./telegram.server";
+import {
+	editTelegramMessage,
+	sendMediaGroup,
+	sendPhoto,
+	sendTelegramMessage,
+	sendVideo,
+} from "./telegram.actions.server";
 import type { replyQueueItem, tweet } from "./types";
 
 enum LineType {
@@ -72,16 +78,48 @@ export const sendTweetQueryItem = async (
 			graph,
 			reply_markup
 		);
+		console.log(createdMessageId);
 	} else {
-		createdMessageId = await sendTelegramMessage(chat_id, graph, reply_markup);
-	}
-	if (!message_id && createdMessageId) {
-		telegramLock.set({
-			chat_id: item.chat_id,
-			reply_queue_item: item,
-			account_id: item.account_id,
-			message_id: createdMessageId,
-		});
+		createdMessageId = await sendTelegramMessage(
+			chat_id,
+			graph,
+			reply_markup,
+			true
+		);
+		console.log(createdMessageId);
+		if (createdMessageId) {
+			telegramLock.set({
+				chat_id: item.chat_id,
+				reply_queue_item: item,
+				account_id: item.account_id,
+				message_id: createdMessageId,
+			});
+		}
+		if (item.tweet.media) {
+			const validItems: {
+				type: "video" | "photo";
+				media: string;
+			}[] = item.tweet.media
+				.filter((item) =>
+					["photo", "video", "animated_gif"].includes(item.type)
+				)
+				.map((item) => ({
+					type:
+						item.type === "animated_gif"
+							? "photo"
+							: (item.type as "video" | "photo"),
+					media: item.url,
+				}));
+			if (validItems.length) {
+				if (validItems.length === 1) {
+					const mediaItem = validItems[0];
+					if (mediaItem.type === "video")
+						sendVideo(item.chat_id, mediaItem.media);
+					else if (mediaItem.type === "photo")
+						sendPhoto(item.chat_id, mediaItem.media);
+				} else sendMediaGroup(item.chat_id, validItems);
+			}
+		}
 	}
 };
 
