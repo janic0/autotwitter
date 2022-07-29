@@ -107,11 +107,8 @@ const _getMessages = async (): Promise<result[] | null> => {
 				offset
 					? buildSearchParams({
 							offset,
-							allowed_updates: ["message"],
 					  })
-					: buildSearchParams({
-							allowed_updates: ["message"],
-					  })
+					: ""
 			}`
 		);
 		const data = await response.json();
