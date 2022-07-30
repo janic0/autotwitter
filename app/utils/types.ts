@@ -20,6 +20,9 @@ export interface config {
 		value: [string, string?];
 		tz: number;
 	};
+	telegram?: {
+		includeOrdinaryTweets: boolean;
+	};
 	allowTelegramResponses?: boolean;
 }
 
@@ -57,6 +60,7 @@ export interface tweetAuthor {
 
 export interface tweet {
 	id: string;
+	author_id: string;
 	text: string;
 	author?: tweetAuthor;
 	replied_to?: {

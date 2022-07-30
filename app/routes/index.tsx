@@ -368,35 +368,74 @@ export default function Index() {
 								</div>
 							)}
 						</div>
-						<div className="flex justify-between w-full">
-							<strong>Answer via Telegram</strong>
-							<div
-								className="h-full dark:bg-slate-900  bg-white relative rounded-2xl w-16 cursor-pointer group"
-								onClick={() => {
-									setAccounts(
-										accounts.map((c, i) => {
-											if (activeAccountIndex === i) {
-												return {
-													...c,
-													config: {
-														...c.config,
-														allowTelegramResponses:
-															!c.config.allowTelegramResponses,
-													},
-												};
-											}
-											return c;
-										})
-									);
-								}}
-							>
+						<div className="flex flex-col gap-4 w-full">
+							<div className="flex justify-between w-full h-6">
+								<p>Answer via Telegram</p>
 								<div
-									className={`rounded-full bg-primary absolute top-2 bottom-2 left-2 group-hover:top-1.5 group-hover:bottom-1.5 transition-all ${
-										account.config.allowTelegramResponses ? "w-12" : "w-4"
-									}`}
-								/>
+									className="h-full dark:bg-slate-900  bg-white relative rounded-2xl w-16 cursor-pointer group"
+									onClick={() => {
+										setAccounts(
+											accounts.map((c, i) => {
+												if (activeAccountIndex === i) {
+													return {
+														...c,
+														config: {
+															...c.config,
+															allowTelegramResponses:
+																!c.config.allowTelegramResponses,
+														},
+													};
+												}
+												return c;
+											})
+										);
+									}}
+								>
+									<div
+										className={`rounded-full bg-primary absolute top-2 bottom-2 left-2 group-hover:top-1.5 group-hover:bottom-1.5 transition-all ${
+											account.config.allowTelegramResponses ? "w-12" : "w-4"
+										}`}
+									/>
+								</div>
 							</div>
+							{account.config.allowTelegramResponses && (
+								<div className="flex justify-between w-full h-6">
+									<p>Include ordinary Tweets</p>
+									<div
+										className="h-full dark:bg-slate-900  bg-white relative rounded-2xl w-16 cursor-pointer group"
+										onClick={() => {
+											setAccounts(
+												accounts.map((c, i) => {
+													if (activeAccountIndex === i) {
+														return {
+															...c,
+															config: {
+																...c.config,
+																telegram: {
+																	...c.config.telegram,
+																	includeOrdinaryTweets:
+																		!c.config.telegram?.includeOrdinaryTweets,
+																},
+															},
+														};
+													}
+													return c;
+												})
+											);
+										}}
+									>
+										<div
+											className={`rounded-full bg-primary absolute top-2 bottom-2 left-2 group-hover:top-1.5 group-hover:bottom-1.5 transition-all ${
+												account.config.telegram?.includeOrdinaryTweets
+													? "w-12"
+													: "w-4"
+											}`}
+										/>
+									</div>
+								</div>
+							)}
 						</div>
+
 						<button
 							className="bg-cyan-50 dark:bg-slate-900 dark:text-white border-primary border-2 text-black rounded transition-all p-2"
 							onClick={updateConfig}

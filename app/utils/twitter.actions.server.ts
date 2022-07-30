@@ -13,18 +13,22 @@ const sentTweetsIds: { [key: string]: boolean } = {};
 
 export const getMentioningTweets = async (
 	userId: string,
-	token: string
+	token: string,
+	type: "mention-only" | "all" = "mention-only"
 ): Promise<false | tweet[]> => {
 	try {
 		const since_id = (await get(`last_mention_id=${userId}`)) || undefined;
 		const request = await fetch(
-			`https://api.twitter.com/2/users/${userId}/mentions${buildSearchParams({
+			`https://api.twitter.com/2/users/${userId}/${
+				type === "mention-only" ? "mentions" : "timelines/reverse_chronological"
+			}${buildSearchParams({
 				expansions: [
 					"referenced_tweets.id",
 					"referenced_tweets.id.author_id",
 					"author_id",
 					"attachments.media_keys",
 				].join(","),
+				exclude: type === "all" ? ["retweets", "replies"].join(",") : undefined,
 				"media.fields": ["type", "url"].join(","),
 				"tweet.fields": ["id", "text"].join(","),
 				"user.fields": ["name", "username"].join(","),
@@ -37,8 +41,12 @@ export const getMentioningTweets = async (
 				},
 			}
 		);
-		if (!request.ok) return false;
+		if (!request.ok) {
+			console.trace(await request.json());
+			return false;
+		}
 		const data = (await request.json()) as GetMentionsResponse;
+		console.log(data);
 		if (
 			typeof data === "object" &&
 			data &&
@@ -47,35 +55,41 @@ export const getMentioningTweets = async (
 		) {
 			set("last_mention_id=" + userId, data?.meta.newest_id);
 			if (!since_id) return [];
-			const authorMap = data.includes?.users?.reduce(
-				(acc, user) => ({ ...acc, [user.id]: user }),
-				{} as { [key: string]: tweetAuthor }
-			);
-			const referencedTweetsMap = data.includes?.tweets?.reduce(
-				(acc, tweet) => ({ ...acc, [tweet.id]: tweet }),
-				{} as { [key: string]: { text: string; id: string; author_id: string } }
-			);
+			const authorMap =
+				data.includes?.users?.reduce(
+					(acc, user) => ({ ...acc, [user.id]: user }),
+					{} as { [key: string]: tweetAuthor }
+				) || {};
+			const referencedTweetsMap =
+				data.includes?.tweets?.reduce(
+					(acc, tweet) => ({ ...acc, [tweet.id]: tweet }),
+					{} as {
+						[key: string]: { text: string; id: string; author_id: string };
+					}
+				) || {};
 
-			const mediaKeysMap = data.includes?.media?.reduce(
-				(acc, media) => ({ ...acc, [media.media_key]: media }),
-				{} as {
-					[key: string]: {
-						media_key: string;
-						url: string;
-						type: string;
-					};
-				}
-			);
+			const mediaKeysMap =
+				data.includes?.media?.reduce(
+					(acc, media) => ({ ...acc, [media.media_key]: media }),
+					{} as {
+						[key: string]: {
+							media_key: string;
+							url: string;
+							type: string;
+						};
+					}
+				) || {};
 
-			return data.data.map(
+			const sortedData = data.data.map(
 				(tweet): tweet => ({
 					...tweet,
 					author: authorMap[tweet.author_id],
 					replied_to: {
-						...referencedTweetsMap[tweet.referenced_tweets[0]?.id],
+						...referencedTweetsMap[(tweet.referenced_tweets || [])[0]?.id],
 						author:
 							authorMap[
-								referencedTweetsMap[tweet.referenced_tweets[0]?.id]?.author_id
+								referencedTweetsMap[(tweet.referenced_tweets || [])[0]?.id]
+									?.author_id
 							],
 					},
 					media: tweet.attachments?.media_keys
@@ -83,6 +97,8 @@ export const getMentioningTweets = async (
 						?.filter((m) => m),
 				})
 			) as tweet[];
+			if (type === "mention-only") return sortedData;
+			else return sortedData.filter((tweet) => tweet.author_id !== userId);
 		}
 		return false;
 	} catch (e) {

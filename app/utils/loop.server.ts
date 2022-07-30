@@ -136,7 +136,11 @@ const telegramResponderIteration = async () => {
 			if (notificationMethods.telegram) {
 				const token = await getToken(userId);
 				if (token)
-					getMentioningTweets(userId, token).then(async (tweets) => {
+					getMentioningTweets(
+						userId,
+						token,
+						userConfig.telegram?.includeOrdinaryTweets ? "all" : "mention-only"
+					).then(async (tweets) => {
 						if (!tweets) return;
 						tweets.forEach((tweet) => {
 							const replyQueueItem: replyQueueItem = {

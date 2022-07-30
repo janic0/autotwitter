@@ -30,7 +30,7 @@ const generateTweetGraph = (tweet: tweet, answer?: string) => {
 		renderLines(LineType.END);
 		currentIndentationLevel++;
 	};
-	if (tweet.replied_to)
+	if (tweet.replied_to?.text)
 		renderSection([
 			`${tweet.replied_to.author?.name || "?"}  (@${
 				tweet.replied_to.author?.username || "?"

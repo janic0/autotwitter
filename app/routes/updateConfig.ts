@@ -82,6 +82,9 @@ const _resetConfig = (userId: string) => {
 			],
 			tz: 0,
 		},
+		telegram: {
+			includeOrdinaryTweets: true,
+		},
 		allowTelegramResponses: false,
 	};
 	_updateConfig(defaultConfig, userId);
@@ -98,6 +101,9 @@ const _updateConfig = (body: config, userId: string) => {
 		["day", "week", "hour"].includes(body.frequency.type) &&
 		typeof body.frequency.value === "number" &&
 		body.frequency.value >= 0 &&
+		typeof body.telegram === "object" &&
+		body.telegram &&
+		typeof body.telegram.includeOrdinaryTweets === "boolean" &&
 		typeof body.time === "object" &&
 		body.time &&
 		typeof body.time.type === "string" &&
@@ -141,6 +147,9 @@ const _updateConfig = (body: config, userId: string) => {
 						hour: parseInt(timeString?.slice(0, 2)!),
 						minute: parseInt(timeString?.slice(3, 5)!),
 					})),
+			},
+			telegram: {
+				includeOrdinaryTweets: body.telegram.includeOrdinaryTweets,
 			},
 			allowTelegramResponses: !!body.allowTelegramResponses,
 		};
