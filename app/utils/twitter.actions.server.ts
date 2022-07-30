@@ -14,11 +14,13 @@ const sentTweetsIds: { [key: string]: boolean } = {};
 export const getMentioningTweets = async (
 	userId: string,
 	token: string,
-	type: "mention-only" | "all" = "mention-only"
+	type: "mention-only" | "all" = "mention-only",
+	start_id?: string
 ): Promise<false | tweet[]> => {
 	console.log(type, "for", userId);
 	try {
-		const since_id = (await get(`last_mention_id=${userId}`)) || undefined;
+		const since_id =
+			start_id || (await get(`last_mention_id=${userId}`)) || undefined;
 		const request = await fetch(
 			`https://api.twitter.com/2/users/${userId}/${
 				type === "mention-only" ? "mentions" : "timelines/reverse_chronological"
@@ -98,6 +100,7 @@ export const getMentioningTweets = async (
 						?.filter((m) => m),
 				})
 			) as tweet[];
+			console.log(type);
 			if (type === "mention-only") return sortedData;
 			else {
 				const result = sortedData.filter(
@@ -105,16 +108,20 @@ export const getMentioningTweets = async (
 						tweet.author_id !== userId &&
 						(!tweet.replied_to?.text || tweet.replied_to?.author?.id == userId)
 				);
+				console.log("CALLING getMentionedTweets");
 				const mentionedResult = await getMentioningTweets(
 					userId,
 					token,
-					"mention-only"
+					"mention-only",
+					since_id
 				);
+				console.log(result, mentionedResult);
 				if (mentionedResult) return [...result, ...mentionedResult];
 				else return result;
 			}
+		} else {
+			return false;
 		}
-		return false;
 	} catch (e) {
 		console.trace(e);
 		return false;

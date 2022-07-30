@@ -168,6 +168,7 @@ const startLoop = async () => {
 	setInterval(handleIteration, 5000);
 	setInterval(reminderIteration, 5000);
 	setInterval(telegramResponderIteration, 30_000);
+	telegramResponderIteration();
 };
 
 export default startLoop;
