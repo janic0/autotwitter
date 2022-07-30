@@ -16,7 +16,7 @@ export const getMentioningTweets = async (
 	token: string,
 	type: "mention-only" | "all" = "mention-only"
 ): Promise<false | tweet[]> => {
-	console.log(type);
+	console.log(type, "for", userId);
 	try {
 		const since_id = (await get(`last_mention_id=${userId}`)) || undefined;
 		const request = await fetch(
@@ -29,7 +29,7 @@ export const getMentioningTweets = async (
 					"author_id",
 					"attachments.media_keys",
 				].join(","),
-				exclude: type === "all" ? ["retweets"].join(",") : undefined,
+				exclude: type === "all" ? ["retweets", "replies"].join(",") : undefined,
 				"media.fields": ["type", "url"].join(","),
 				"tweet.fields": ["id", "text"].join(","),
 				"user.fields": ["name", "username"].join(","),
@@ -99,12 +99,20 @@ export const getMentioningTweets = async (
 				})
 			) as tweet[];
 			if (type === "mention-only") return sortedData;
-			else
-				return sortedData.filter(
+			else {
+				const result = sortedData.filter(
 					(tweet) =>
 						tweet.author_id !== userId &&
 						(!tweet.replied_to?.text || tweet.replied_to?.author?.id == userId)
 				);
+				const mentionedResult = await getMentioningTweets(
+					userId,
+					token,
+					"mention-only"
+				);
+				if (mentionedResult) return [...result, ...mentionedResult];
+				else return result;
+			}
 		}
 		return false;
 	} catch (e) {
