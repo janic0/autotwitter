@@ -1,7 +1,8 @@
 import { v4 } from "uuid";
 import { getSingleConfig } from "../routes/updateConfig";
 import getUserMeta, { getSingleUserMeta } from "./getUserMeta.server";
-import { replyQueue, telegramLock, _replyToTweet } from "./loop.server";
+import { replyQueue, telegramLock } from "./loop.server";
+import { likeOrRetweetTweet, replyToTweet } from "./twitter.actions.server";
 import buildSearchParams from "./params";
 import { client, del, get, set } from "./redis.server";
 import { scheduleTweet } from "./schedule.server";
@@ -50,8 +51,6 @@ const intervalHandler = async () => {
 					const accountIds = await getAccountsWithTelegramID(
 						message.message.chat.id
 					);
-
-					console.log(accountIds);
 					if (accountIds.length)
 						return sendTelegramMessage(
 							message.message.chat.id,
@@ -116,7 +115,7 @@ const intervalHandler = async () => {
 								);
 							const token = await getToken(lock.account_id);
 							if (token) {
-								_replyToTweet(
+								replyToTweet(
 									lock.reply_queue_item.tweet.id,
 									message.message.text,
 									token
@@ -220,18 +219,24 @@ const intervalHandler = async () => {
 				message.callback_query &&
 				typeof message.callback_query.data === "string"
 			) {
-				// if (message.callback_query.data === "like_queue_item") {
-				// 	const lock = await telegramLock.get(message.callback_query.from.id);
-				// 	if (lock && lock.reply_queue_item) {
-				// 		// do liking
-
-				// 		sendTweetQueryItem(
-				// 			{ ...lock.reply_queue_item, liked: !lock.reply_queue_item.liked },
-				// 			message.callback_query.from.id,
-				// 			message.callback_query?.message?.chat?.id
-				// 		);
-				// 	}
-				// }
+				if (
+					message.callback_query.data.startsWith("like_") ||
+					message.callback_query.data.startsWith("retweet_")
+				) {
+					const type = message.callback_query.data.startsWith("like_")
+						? "like"
+						: "retweet";
+					const presumedId = message.callback_query.data.slice(type.length + 1);
+					const chat_id =
+						message.callback_query.message?.chat.id ||
+						message.callback_query.from.id;
+					const replyQueueItems = await replyQueue.get(chat_id);
+					const item = replyQueueItems.find((i) => i.tweet.id == presumedId);
+					if (item && item.message_id) {
+						const token = await getToken(item.account_id);
+						if (token) likeOrRetweetTweet(type, item, token);
+					}
+				}
 				if (message.callback_query.data === "skip_queue_item") {
 					const lock = await telegramLock.get(message.callback_query.from.id);
 					if (lock && lock.reply_queue_item) {

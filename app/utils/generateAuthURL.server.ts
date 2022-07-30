@@ -23,7 +23,7 @@ export default (
 			response_type: "code",
 			client_id: secretsServer.CLIENT_ID,
 			redirect_uri: secretsServer.URL + "/tw/authorize",
-			scope: "tweet.read tweet.write users.read offline.access",
+			scope: "tweet.read tweet.write users.read offline.access like.write",
 			state,
 			code_challenge: challenge,
 			code_challenge_method: "plain",

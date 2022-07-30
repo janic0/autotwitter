@@ -1,4 +1,4 @@
-import { telegramLock } from "./loop.server";
+import { replyQueue, telegramLock } from "./loop.server";
 import {
 	editTelegramMessage,
 	sendMediaGroup,
@@ -55,12 +55,16 @@ export const sendTweetQueryItem = async (
 		inline_keyboard: item.answer
 			? []
 			: [
-					// [
-					// 	{
-					// 		text: item.liked ? "Like" : "Unlike",
-					// 		callback_data: "like_queue_item",
-					// 	},
-					// ],
+					[
+						{
+							text: item.liked ? "Unlike" : "Like",
+							callback_data: "like_" + item.tweet.id,
+						},
+						{
+							text: item.retweeted ? "Un-Retweet" : "Retweet",
+							callback_data: "retweet_" + item.tweet.id,
+						},
+					],
 					[
 						{
 							text: "Skip",
@@ -70,28 +74,24 @@ export const sendTweetQueryItem = async (
 			  ],
 	};
 
-	let createdMessageId: false | number | undefined = message_id;
 	if (message_id) {
-		createdMessageId = await editTelegramMessage(
-			chat_id,
-			message_id,
-			graph,
-			reply_markup
-		);
-		console.log(createdMessageId);
+		editTelegramMessage(chat_id, message_id, graph, reply_markup);
 	} else {
-		createdMessageId = await sendTelegramMessage(
+		const createdMessageId = await sendTelegramMessage(
 			chat_id,
 			graph,
 			reply_markup,
 			true
 		);
-		console.log(createdMessageId);
 		if (createdMessageId) {
 			telegramLock.set({
 				chat_id: item.chat_id,
 				reply_queue_item: item,
 				account_id: item.account_id,
+				message_id: createdMessageId,
+			});
+			replyQueue._modify({
+				...item,
 				message_id: createdMessageId,
 			});
 		}

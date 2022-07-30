@@ -76,8 +76,10 @@ export interface replyQueueItem {
 		text: string;
 	};
 	chat_id: number;
+	message_id?: number;
 	account_id: string;
 	liked: boolean;
+	retweeted: boolean;
 	reported_at: number;
 }
 export interface TelegramMessageLock {
