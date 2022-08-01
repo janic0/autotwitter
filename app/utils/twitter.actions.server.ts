@@ -53,10 +53,11 @@ export const getMentioningTweets = async (
 		if (
 			typeof data === "object" &&
 			data &&
-			typeof data.data === "object" &&
-			Array.isArray(data.data)
+			typeof data.meta === "object" &&
+			data.meta &&
+			typeof data.meta.result_count === "number"
 		) {
-			set("last_mention_id=" + userId, data?.meta.newest_id);
+			set("last_mention_id=" + userId, data.meta.newest_id);
 			if (!since_id) return [];
 			const authorMap =
 				data.includes?.users?.reduce(
@@ -83,39 +84,35 @@ export const getMentioningTweets = async (
 					}
 				) || {};
 
-			const sortedData = data.data.map(
-				(tweet): tweet => ({
-					...tweet,
-					author: authorMap[tweet.author_id],
-					replied_to: {
-						...referencedTweetsMap[(tweet.referenced_tweets || [])[0]?.id],
-						author:
-							authorMap[
-								referencedTweetsMap[(tweet.referenced_tweets || [])[0]?.id]
-									?.author_id
-							],
-					},
-					media: tweet.attachments?.media_keys
-						?.map((key) => mediaKeysMap[key])
-						?.filter((m) => m),
-				})
-			) as tweet[];
-			console.log(type);
+			const sortedData =
+				data.data
+					?.map(
+						(tweet): tweet => ({
+							...tweet,
+							author: authorMap[tweet.author_id],
+							replied_to: {
+								...referencedTweetsMap[(tweet.referenced_tweets || [])[0]?.id],
+								author:
+									authorMap[
+										referencedTweetsMap[(tweet.referenced_tweets || [])[0]?.id]
+											?.author_id
+									],
+							},
+							media: tweet.attachments?.media_keys
+								?.map((key) => mediaKeysMap[key])
+								?.filter((m) => m),
+						})
+					)
+					?.reverse() || [];
 			if (type === "mention-only") return sortedData;
 			else {
-				const result = sortedData.filter(
-					(tweet) =>
-						tweet.author_id !== userId &&
-						(!tweet.replied_to?.text || tweet.replied_to?.author?.id == userId)
-				);
-				console.log("CALLING getMentionedTweets");
+				const result = sortedData.filter((tweet) => tweet.author_id !== userId);
 				const mentionedResult = await getMentioningTweets(
 					userId,
 					token,
 					"mention-only",
 					since_id
 				);
-				console.log(result, mentionedResult);
 				if (mentionedResult) return [...result, ...mentionedResult];
 				else return result;
 			}
