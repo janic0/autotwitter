@@ -57,7 +57,8 @@ export const getMentioningTweets = async (
 			data.meta &&
 			typeof data.meta.result_count === "number"
 		) {
-			set("last_mention_id=" + userId, data.meta.newest_id);
+			if (data.meta.newest_id)
+				set("last_mention_id=" + userId, data.meta.newest_id);
 			if (!since_id) return [];
 			const authorMap =
 				data.includes?.users?.reduce(

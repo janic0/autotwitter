@@ -44,7 +44,7 @@ const set = async (key: string, value: any, expires = false) => {
 	await ensureClientOpen();
 	cache[key] = value;
 	return client.set(key, encoded || "", {
-		EX: expires ? 60 * 60 * 24 * 7 : undefined,
+		EX: expires ? 60 * 60 : undefined,
 	});
 };
 
