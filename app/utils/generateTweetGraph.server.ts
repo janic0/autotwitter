@@ -46,7 +46,7 @@ const generateTweetMarkdown = (tweet: tweet, answer?: string) => {
 		)}](https://twitter.com/${tweet.author?.username})`,
 		`*${escapeMarkdown(tweet.text)}*`,
 	]);
-	if (answer) renderSection([escapeMarkdown(answer)]);
+	if (answer) renderSection([`_${escapeMarkdown(answer)}_`]);
 	return value;
 };
 
@@ -56,7 +56,6 @@ export const sendTweetQueryItem = async (
 	message_id?: number
 ) => {
 	const graph = generateTweetMarkdown(item.tweet, item.answer?.text);
-	console.log(graph);
 	const reply_markup = {
 		inline_keyboard: item.answer
 			? [
