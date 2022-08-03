@@ -1,6 +1,7 @@
 import { replyQueue, telegramLock } from "./loop.server";
 import {
 	editTelegramMessage,
+	escapeMarkdown,
 	sendMediaGroup,
 	sendPhoto,
 	sendTelegramMessage,
@@ -13,7 +14,7 @@ enum LineType {
 	END,
 }
 
-const generateTweetGraph = (tweet: tweet, answer?: string) => {
+const generateTweetMarkdown = (tweet: tweet, answer?: string) => {
 	let value = "";
 	let currentIndentationLevel = 0;
 	const renderLines = (type: LineType) =>
@@ -32,16 +33,20 @@ const generateTweetGraph = (tweet: tweet, answer?: string) => {
 	};
 	if (tweet.replied_to?.text)
 		renderSection([
-			`${tweet.replied_to.author?.name || "?"}  (@${
-				tweet.replied_to.author?.username || "?"
-			})`,
-			tweet.replied_to.text,
+			`[${escapeMarkdown(
+				`${tweet.replied_to.author?.name || "?"} (@${
+					tweet.replied_to.author?.username || "?"
+				})`
+			)}](https://twitter.com/${tweet.replied_to.author?.username})`,
+			`_${escapeMarkdown(tweet.replied_to.text)}_`,
 		]);
 	renderSection([
-		`${tweet.author?.name || "?"}  (@${tweet.author?.username || "?"})`,
-		tweet.text,
+		`[${escapeMarkdown(
+			`${tweet.author?.name || "?"} (@${tweet.author?.username || "?"})`
+		)}](https://twitter.com/${tweet.author?.username})`,
+		`*${escapeMarkdown(tweet.text)}*`,
 	]);
-	if (answer) renderSection([answer]);
+	if (answer) renderSection([escapeMarkdown(answer)]);
 	return value;
 };
 
@@ -50,10 +55,22 @@ export const sendTweetQueryItem = async (
 	chat_id: number,
 	message_id?: number
 ) => {
-	const graph = generateTweetGraph(item.tweet, item.answer?.text);
+	const graph = generateTweetMarkdown(item.tweet, item.answer?.text);
+	console.log(graph);
 	const reply_markup = {
 		inline_keyboard: item.answer
-			? []
+			? [
+					[
+						{
+							text: item.liked ? "Unlike" : "Like",
+							callback_data: "like_" + item.tweet.id,
+						},
+						{
+							text: item.retweeted ? "Un-Retweet" : "Retweet",
+							callback_data: "retweet_" + item.tweet.id,
+						},
+					],
+			  ]
 			: [
 					[
 						{
@@ -75,13 +92,18 @@ export const sendTweetQueryItem = async (
 	};
 
 	if (message_id) {
-		editTelegramMessage(chat_id, message_id, graph, reply_markup);
+		editTelegramMessage(chat_id, message_id, graph, reply_markup, {
+			markdown: true,
+		});
 	} else {
 		const createdMessageId = await sendTelegramMessage(
 			chat_id,
 			graph,
 			reply_markup,
-			true
+			{
+				disable_preview: true,
+				markdown: true,
+			}
 		);
 		if (createdMessageId) {
 			telegramLock.set({
@@ -123,4 +145,4 @@ export const sendTweetQueryItem = async (
 	}
 };
 
-export default generateTweetGraph;
+export default generateTweetMarkdown;

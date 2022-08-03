@@ -21,6 +21,37 @@ interface result {
 	};
 }
 
+const replaceAll = (str: string, find: string, replace: string) =>
+	str.split(find).join(replace);
+
+const charactersToEscape = [
+	"_",
+	"*",
+	"[",
+	"]",
+	"(",
+	")",
+	"~",
+	"`",
+	">",
+	"#",
+	"+",
+	"-",
+	"=",
+	"|",
+	"{",
+	"}",
+	".",
+	"!",
+];
+
+export const escapeMarkdown = (i: string) => {
+	let text = i;
+	for (let char of charactersToEscape)
+		text = replaceAll(text, char, "\\" + char);
+	return text;
+};
+
 const _runMessageSendingQuery = async (
 	ressource: string,
 	body: any
@@ -60,13 +91,14 @@ export const sendTelegramMessage = async (
 	} = {
 		inline_keyboard: [],
 	},
-	disable_web_page_preview: boolean = false
+	config?: { markdown?: boolean; disable_preview?: boolean }
 ): Promise<false | number> =>
 	_runMessageSendingQuery("sendMessage", {
 		chat_id,
 		text,
 		reply_markup,
-		disable_web_page_preview,
+		disable_web_page_preview: config?.disable_preview || false,
+		parse_mode: config?.markdown ? "MarkdownV2" : undefined,
 	});
 
 export const editTelegramMessage = async (
@@ -77,13 +109,15 @@ export const editTelegramMessage = async (
 		inline_keyboard: { text: string; url?: string; callback_data?: string }[][];
 	} = {
 		inline_keyboard: [],
-	}
+	},
+	config?: { markdown?: boolean }
 ): Promise<false | number> =>
 	_runMessageSendingQuery("editMessageText", {
 		chat_id,
 		message_id,
 		text,
 		reply_markup,
+		parse_mode: config?.markdown ? "MarkdownV2" : undefined,
 	});
 
 export const sendMediaGroup = async (
