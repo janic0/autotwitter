@@ -1,4 +1,4 @@
-import { replyQueue } from "./loop.server";
+import {replyQueue, telegramLock} from "./loop.server";
 import buildSearchParams from "./params";
 import { get, set } from "./redis.server";
 import type {
@@ -225,11 +225,12 @@ export const likeOrRetweetTweet = async (
 			data.data &&
 			typeof data.data[key] === "boolean"
 		) {
-			if (replyQueueItem.message_id)
-				replyQueue.modify({
-					...replyQueueItem,
+			const latestReplyQueueItem = await replyQueue.getLatest(replyQueueItem)
+			if (latestReplyQueueItem && latestReplyQueueItem.message_id)
+					replyQueue.modify({
+					...latestReplyQueueItem,
 					[key]: data.data[key],
-				});
+				}, undefined,(await telegramLock.get(replyQueueItem.chat_id))?.reply_queue_item?.tweet?.id == replyQueueItem.tweet.id);
 			return {
 				value: data.data[key],
 			};

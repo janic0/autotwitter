@@ -13,6 +13,7 @@ interface message {
 interface result {
 	message?: message;
 	callback_query?: {
+		id: string;
 		data: string;
 		from: {
 			id: number;
@@ -52,10 +53,10 @@ export const escapeMarkdown = (i: string) => {
 	return text;
 };
 
-const _runMessageSendingQuery = async (
+const _queryTelegram = async (
 	ressource: string,
 	body: any
-): Promise<number | false> => {
+): Promise<any | false> => {
 	if (!secretsServer.TELEGRAM_TOKEN) return false;
 	try {
 		const r = await fetch(
@@ -77,11 +78,35 @@ const _runMessageSendingQuery = async (
 			console.trace(data);
 			return false;
 		}
-		return data?.result?.message_id;
+		return data.result;
 	} catch {
 		return false;
 	}
 };
+
+const _runMessageSendingQuery = async (
+	ressource: string,
+	body: any
+): Promise<number | false> => {
+	const resp = await _queryTelegram(ressource, body)
+	if (!resp) return false;
+	return resp?.message_id;
+};
+
+export const answerCallbackQuery = async (callback_query_id: string, text: string, config: {
+	show_alert?: boolean;
+	url?: string;
+	cache_time?: number;
+} = {}): Promise<boolean> => {
+	const resp = await _queryTelegram("answerCallbackQuery", {
+		callback_query_id,
+		text: text,
+		show_alert: config.show_alert,
+		url: config.url,
+		cache_time: config.cache_time
+	})
+	return !!resp;
+}
 
 export const sendTelegramMessage = async (
 	chat_id: number,
@@ -110,7 +135,7 @@ export const editTelegramMessage = async (
 	} = {
 		inline_keyboard: [],
 	},
-	config?: { markdown?: boolean }
+	config?: { markdown?: boolean; disable_preview?: boolean }
 ): Promise<false | number> =>
 	_runMessageSendingQuery("editMessageText", {
 		chat_id,
@@ -118,6 +143,7 @@ export const editTelegramMessage = async (
 		text,
 		reply_markup,
 		parse_mode: config?.markdown ? "MarkdownV2" : undefined,
+		disable_web_page_preview: config?.disable_preview || false,
 	});
 
 export const sendMediaGroup = async (

@@ -81,6 +81,7 @@ export interface replyQueueItem {
 	};
 	chat_id: number;
 	message_id?: number;
+	computed_at?: number;
 	account_id: string;
 	liked: boolean;
 	retweeted: boolean;
