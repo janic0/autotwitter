@@ -148,7 +148,7 @@ const intervalHandler = async () => {
                                     const sections = sectionize(text);
                                     let lastTweetId = lock.reply_queue_item.tweet.id;
                                     const sectionsAmount = sections.length;
-                                    for (let i in sections) {
+                                    for (let i = 0; i < sections.length; i++) {
                                         const token = await getToken(lock.account_id);
                                         if (!token) break
                                         else {
