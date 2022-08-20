@@ -369,10 +369,10 @@ export default function Index() {
 							)}
 						</div>
 						<div className="flex flex-col gap-4 w-full">
-							<div className="flex justify-between w-full h-6">
+							<div className="flex justify-between w-full">
 								<p>Answer via Telegram</p>
 								<div
-									className="h-full dark:bg-slate-900  bg-white relative rounded-2xl w-16 cursor-pointer group"
+									className="h-full dark:bg-slate-900 h-6 bg-white relative rounded-2xl min-w-[4rem] cursor-pointer group"
 									onClick={() => {
 										setAccounts(
 											accounts.map((c, i) => {
@@ -399,10 +399,10 @@ export default function Index() {
 								</div>
 							</div>
 							{account.config.allowTelegramResponses && (
-								<div className="flex justify-between w-full h-6">
+								<div className="flex justify-between w-full">
 									<p>Include ordinary Tweets</p>
 									<div
-										className="h-full dark:bg-slate-900  bg-white relative rounded-2xl w-16 cursor-pointer group"
+										className="h-full dark:bg-slate-900 h-6 bg-white relative rounded-2xl min-w-[4rem] cursor-pointer group"
 										onClick={() => {
 											setAccounts(
 												accounts.map((c, i) => {
@@ -427,6 +427,42 @@ export default function Index() {
 										<div
 											className={`rounded-full bg-primary absolute top-2 bottom-2 left-2 group-hover:top-1.5 group-hover:bottom-1.5 transition-all ${
 												account.config.telegram?.includeOrdinaryTweets
+													? "w-12"
+													: "w-4"
+											}`}
+										/>
+									</div>
+								</div>
+							)}
+							{account.config.allowTelegramResponses && (
+								<div className="flex justify-between w-full">
+									<p>Auto-Like Tweets when responding</p>
+									<div
+											className="h-full dark:bg-slate-900 h-6  bg-white relative rounded-2xl min-w-[4rem] cursor-pointer group"
+										onClick={() => {
+											setAccounts(
+												accounts.map((c, i) => {
+													if (activeAccountIndex === i) {
+														return {
+															...c,
+															config: {
+																...c.config,
+																telegram: {
+																	...c.config.telegram,
+																	autoLikeOnReply:
+																		!c.config.telegram?.autoLikeOnReply,
+																},
+															},
+														};
+													}
+													return c;
+												})
+											);
+										}}
+									>
+										<div
+											className={`rounded-full bg-primary absolute top-2 bottom-2 left-2 group-hover:top-1.5 group-hover:bottom-1.5 transition-all ${
+												account.config.telegram?.autoLikeOnReply
 													? "w-12"
 													: "w-4"
 											}`}

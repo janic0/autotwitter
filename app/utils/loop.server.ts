@@ -33,6 +33,7 @@ const handleIteration = async () => {
         const token = await getToken(authorId);
         if (token) {
             tweetsToSendMap[authorId].forEach((tweet) => {
+
                 sendTweet(tweet, token);
             });
         }
@@ -87,7 +88,7 @@ export const replyQueue = {
                     res(
                         result
                             .filter((r) => !r.answer)
-                            .sort((a, b) => (b.computed_at || b.reported_at) - (a.computed_at || a.reported_at))
+                            .sort((a, b) => ((b.computed_at || b.reported_at) + (b.tweet.replied_to?.id ? 0 : 1000)) - ((a.computed_at || a.reported_at) + (b.tweet.replied_to?.id ? 0 : 1000)))
                     );
             }
         });
@@ -144,7 +145,7 @@ export const telegramLock = {
 const telegramResponderIteration = async () => {
     const prefix = "userConfig=";
     const keys = await client.keys(prefix + "*");
-    keys.forEach(async (key) => {
+    for (const key of keys) {
         const userConfig = (await get(key)) as serverConfig | null;
         if (userConfig && userConfig.allowTelegramResponses) {
             const userId = key.slice(prefix.length);
@@ -175,7 +176,7 @@ const telegramResponderIteration = async () => {
                     });
             }
         }
-    });
+    }
 };
 
 const startLoop = async () => {

@@ -8,6 +8,9 @@ import {
     sendVideo,
 } from "./telegram.actions.server";
 import type {replyQueueItem, tweet} from "./types";
+import {getConfig, getSingleConfig} from "~/routes/updateConfig";
+import {likeOrRetweetTweet} from "~/utils/twitter.actions.server";
+import getToken from "~/utils/tw/getToken.server";
 
 enum LineType {
     START,
@@ -24,7 +27,7 @@ const generateTweetMarkdown = (tweet: tweet, answer?: string) => {
             "━".repeat(5) +
             "\n");
     const renderText = (text: string) =>
-        (value += "  ".repeat(currentIndentationLevel) + "    " + text + "\n");
+        (value += "  ".repeat(currentIndentationLevel) + "    " + (text.length > 3450 ? text.slice(0, 3450) + "..." : text) + "\n");
     const renderSection = (texts: string[]) => {
         renderLines(LineType.START);
         texts.forEach((text) => renderText(text));
@@ -102,11 +105,43 @@ export const sendTweetQueryItem = async (
     };
 
     if (message_id) {
+        const config = await getSingleConfig(item.account_id);
+        if (config.telegram?.autoLikeOnReply && !item.liked && item.answer?.text) {
+            const token = await getToken(item.account_id);
+            if (token)
+                likeOrRetweetTweet("like", item, token)
+        }
         editTelegramMessage(chat_id, message_id, graph, reply_markup, {
             markdown: true,
             disable_preview: true
         });
     } else {
+        if (item.tweet.media) {
+            const validItems: {
+                type: "video" | "photo";
+                media: string;
+            }[] = item.tweet.media
+                .filter((item) =>
+                    ["photo", "video", "animated_gif"].includes(item.type)
+                )
+                .map((item) => ({
+                    type:
+                        item.type === "animated_gif"
+                            ? "photo"
+                            : (item.type as "video" | "photo"),
+                    media: item.url,
+                }));
+            if (validItems.length) {
+                if (validItems.length === 1) {
+                    const mediaItem = validItems[0];
+                    // Twitter API does now allow video urls, so
+                    // if (mediaItem.type === "video")
+                    //  sendVideo(item.chat_id, mediaItem.media);
+                    if (mediaItem.type === "photo")
+                        await sendPhoto(item.chat_id, mediaItem.media);
+                } else await sendMediaGroup(item.chat_id, validItems);
+            }
+        }
         const createdMessageId = await sendTelegramMessage(
             chat_id,
             graph,
@@ -130,31 +165,6 @@ export const sendTweetQueryItem = async (
                 account_id: item.account_id,
                 message_id: createdMessageId,
             });
-        }
-        if (item.tweet.media) {
-            const validItems: {
-                type: "video" | "photo";
-                media: string;
-            }[] = item.tweet.media
-                .filter((item) =>
-                    ["photo", "video", "animated_gif"].includes(item.type)
-                )
-                .map((item) => ({
-                    type:
-                        item.type === "animated_gif"
-                            ? "photo"
-                            : (item.type as "video" | "photo"),
-                    media: item.url,
-                }));
-            if (validItems.length) {
-                if (validItems.length === 1) {
-                    const mediaItem = validItems[0];
-                    if (mediaItem.type === "video")
-                        sendVideo(item.chat_id, mediaItem.media);
-                    else if (mediaItem.type === "photo")
-                        sendPhoto(item.chat_id, mediaItem.media);
-                } else sendMediaGroup(item.chat_id, validItems);
-            }
         }
     }
 };

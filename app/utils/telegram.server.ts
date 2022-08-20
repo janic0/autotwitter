@@ -42,6 +42,19 @@ const getAccountsWithTelegramID = (telegramId: number): Promise<string[]> => {
     });
 };
 
+export function sectionize(text: string) {
+    const sections = [""];
+    const words = text.split(" ");
+    for (let word of words) {
+        if (!word) continue;
+        const section = sections[sections.length - 1];
+        if (section.length + word.length + 1 >= 270)
+            sections.push(word + " ");
+        else sections[sections.length - 1] += word + " "
+    }
+    return sections;
+}
+
 const intervalHandler = async () => {
     const messages = await _getMessages();
     if (messages !== null) {
@@ -102,17 +115,18 @@ const intervalHandler = async () => {
                     );
                     const lock = await telegramLock.get(message.message.chat.id);
 
-                    if (lock) {
+                    if (accountIds.length === 0)
+                        sendTelegramMessage(
+                            message.message.chat.id,
+                            "Please link an account with /start"
+                        );
+
+                    else if (lock) {
                         const config = await getSingleConfig(lock.account_id);
                         if (
                             config.allowTelegramResponses &&
                             accountIds.includes(lock.account_id)
                         ) {
-                            if (message.message.text.length > 280)
-                                sendTelegramMessage(
-                                    message.message.chat.id,
-                                    "Message too long. Please try again."
-                                );
                             const token = await getToken(lock.account_id);
                             if (token) {
                                 const updatedItem: replyQueueItem = {
@@ -121,31 +135,42 @@ const intervalHandler = async () => {
                                         text: message.message.text,
                                     },
                                 };
-                                replyQueue.modify(updatedItem, lock.message_id, false);
+                                await replyQueue.modify(updatedItem, lock.message_id, false);
                                 replyQueue.nextItem(lock.chat_id);
-                                const newTweetId = await replyToTweet(
-                                    lock.reply_queue_item.tweet.id,
-                                    message.message.text,
-                                    token
-                                );
+                                const text = message.message.text;
+                                if (text.length < 275) {
+                                    await replyToTweet(
+                                        lock.reply_queue_item.tweet.id,
+                                        text,
+                                        token
+                                    );
+                                } else {
+                                    const sections = sectionize(text);
+                                    let lastTweetId = lock.reply_queue_item.tweet.id;
+                                    const sectionsAmount = sections.length;
+                                    for (let i in sections) {
+                                        const token = await getToken(lock.account_id);
+                                        if (!token) break
+                                        else {
+                                            const tweetId = await replyToTweet(lastTweetId, `${sections[i]}(${i}/${sectionsAmount})`, token)
+                                            if (tweetId) lastTweetId = tweetId;
+                                            else break
+                                        }
+                                    }
+                                }
                             } else
                                 sendTelegramMessage(lock.chat_id, "Failed to send response.");
                             continue;
                         } else telegramLock.clear(lock.chat_id);
                     }
-                    if (accountIds.length === 0)
-                        sendTelegramMessage(
-                            message.message.chat.id,
-                            "Please link an account with /start"
-                        );
 
-                    if (message.message.text.length > 280)
+                    else if (message.message.text.length > 280)
                         sendTelegramMessage(
                             message.message.chat.id,
                             "Message too long. Please use a shorter message."
                         );
 
-                    if (accountIds.length === 1) {
+                    else if (accountIds.length === 1) {
                         const tweet = await scheduleTweet(
                             {
                                 id: v4(),
@@ -255,7 +280,7 @@ const intervalHandler = async () => {
                             },
                         };
 
-                        replyQueue.modify(updatedItem, lock.message_id, false);
+                        await replyQueue.modify(updatedItem, lock.message_id, false);
                         const nextItem = await replyQueue.nextItem(lock.chat_id);
                         const replyOptions: string[] = nextItem ? ["Sure, moving on.", "Next one!", `Check out this tweet by ${nextItem.tweet.author?.name}`, "Going up the timeline", `Next Tweet! Spoilers, it's from ${nextItem.tweet.author?.name}`, `Who's it gonna be? It's ${nextItem.tweet.author?.name}`, lock.reply_queue_item.tweet.author_id != nextItem.tweet.author_id ? `Didn't like ${lock.reply_queue_item.tweet.author?.name}?, maybe you like ${nextItem.tweet.replied_to?.author?.name}`: `Here's another one from ${nextItem.tweet.author?.name}`] : ["Don't have any more tweets for now.", "You're good for now!", "That was all.", "You can go talk to ducks now or something.", "Enjoy your day!"]
                         answerCallbackQuery(message.callback_query.id, replyOptions[Math.floor(Math.random() * replyOptions.length)])
@@ -270,7 +295,7 @@ const intervalHandler = async () => {
                             const replyOptions: string[] = ["I don't have any more tweets. You really don't want to respond to this one?", "Can't escape from this one now!", "What's wrong with this tweet?", "This is the last one."]
                             answerCallbackQuery(message.callback_query.id, replyOptions[Math.floor(Math.random() * replyOptions.length)])
                         } else {
-                            replyQueue.modify({...lock.reply_queue_item, computed_at: (lastReplyQueueItem?.reported_at || 0) + 1}, lock.message_id, false)
+                            await replyQueue.modify({...lock.reply_queue_item, computed_at: (lastReplyQueueItem?.reported_at || 0) + 1}, lock.message_id, false)
                             const nextItem = await replyQueue.nextItem(lock.chat_id)
                             const replyOptions: string[] = [(lock.reply_queue_item.tweet.author_id == nextItem?.tweet.author_id ? `Don't want to do this now? Fine! Here's another one from ${nextItem.tweet.author?.name}.` : `Want to do this one from ${nextItem?.tweet.author?.name}`), "Will show it again later!", "Putting that one aside for a minute.", "I'll show it again after some time"]
                             answerCallbackQuery(message.callback_query.id, replyOptions[Math.floor(Math.random() * replyOptions.length)])

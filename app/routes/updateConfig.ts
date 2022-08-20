@@ -84,6 +84,7 @@ const _resetConfig = (userId: string) => {
 		},
 		telegram: {
 			includeOrdinaryTweets: true,
+			autoLikeOnReply: true
 		},
 		allowTelegramResponses: false,
 	};
@@ -103,7 +104,8 @@ const _updateConfig = (body: config, userId: string) => {
 		body.frequency.value >= 0 &&
 		typeof body.telegram === "object" &&
 		body.telegram &&
-		typeof body.telegram.includeOrdinaryTweets === "boolean" &&
+		(["boolean", "undefined"].includes(typeof body.telegram.includeOrdinaryTweets)) &&
+		(["boolean", "undefined"].includes(typeof body.telegram.autoLikeOnReply)) &&
 		typeof body.time === "object" &&
 		body.time &&
 		typeof body.time.type === "string" &&
@@ -132,7 +134,7 @@ const _updateConfig = (body: config, userId: string) => {
 		(typeof body.allowTelegramResponses === "boolean" ||
 			body.allowTelegramResponses === undefined)
 	) {
-		const newConfig = {
+		const newConfig: serverConfig = {
 			frequency: {
 				type: body.frequency.type,
 				value: body.frequency.value,
@@ -149,7 +151,8 @@ const _updateConfig = (body: config, userId: string) => {
 					})),
 			},
 			telegram: {
-				includeOrdinaryTweets: body.telegram.includeOrdinaryTweets,
+				includeOrdinaryTweets: body.telegram.includeOrdinaryTweets || false,
+				autoLikeOnReply: body.telegram.autoLikeOnReply || false
 			},
 			allowTelegramResponses: !!body.allowTelegramResponses,
 		};

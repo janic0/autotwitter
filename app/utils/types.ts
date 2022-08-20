@@ -21,7 +21,8 @@ export interface config {
 		tz: number;
 	};
 	telegram?: {
-		includeOrdinaryTweets: boolean;
+		includeOrdinaryTweets?: boolean;
+		autoLikeOnReply?: boolean;
 	};
 	allowTelegramResponses?: boolean;
 }
