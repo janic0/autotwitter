@@ -152,7 +152,7 @@ const intervalHandler = async () => {
                                         const token = await getToken(lock.account_id);
                                         if (!token) break
                                         else {
-                                            const tweetId = await replyToTweet(lastTweetId, `${sections[i]}(${i}/${sectionsAmount})`, token)
+                                            const tweetId = await replyToTweet(lastTweetId, `${sections[i]}(${i + 1}/${sectionsAmount})`, token)
                                             if (tweetId) lastTweetId = tweetId;
                                             else break
                                         }
