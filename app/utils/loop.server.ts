@@ -150,7 +150,7 @@ const telegramResponderIteration = async () => {
         if (userConfig && userConfig.allowTelegramResponses) {
             const userId = key.slice(prefix.length);
             const notificationMethods = await get("notificationMethods=" + userId);
-            if (notificationMethods.telegram) {
+            if (notificationMethods && notificationMethods.telegram) {
                 const token = await getToken(userId);
                 if (token)
                     getMentioningTweets(
