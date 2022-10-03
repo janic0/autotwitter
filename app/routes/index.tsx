@@ -1,7 +1,7 @@
 import type { MetaFunction } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { get, set } from "../utils/redis.server";
+import {del, get, set} from "../utils/redis.server";
 import generateAuthURL from "../utils/generateAuthURL.server";
 
 import type { FormEvent } from "react";
@@ -556,16 +556,19 @@ export const loader = async ({ request }: { request: Request }) => {
 
 	const url = new URL(request.url);
 	if (userIds) {
-		if (url.searchParams.has("telegram_id"))
+		if (url.searchParams.has("telegram_id")) {
 			(async () => {
+				const key = "telegram_id=" + url.searchParams.get("telegram_id");
 				const chatId = await get(
-					"telegram_id=" + url.searchParams.get("telegram_id")
+					key
 				);
 				if (chatId) {
+					del(key);
 					const accounts = await getUserMeta(userIds);
+					console.log("Linking Telegram: ", accounts)
 					accounts.forEach(async (account) => {
 						const notificationMethods =
-							(await get("notificationMethods=" + account.id)) || {};
+							await get("notificationMethods=" + account.id) || {};
 						set("notificationMethods=" + account.id, {
 							...notificationMethods,
 							telegram: chatId,
@@ -577,7 +580,8 @@ export const loader = async ({ request }: { request: Request }) => {
 							);
 					});
 				}
-			})();
+			})()
+		}
 		return json({
 			accounts: await getAccounts(userIds),
 		});

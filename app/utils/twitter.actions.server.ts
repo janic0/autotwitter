@@ -1,6 +1,6 @@
 import {replyQueue, telegramLock} from "./loop.server";
 import buildSearchParams from "./params";
-import {get, set} from "./redis.server";
+import {client, get, set} from "./redis.server";
 import type {
     replyQueueItem,
     scheduledTweet,
@@ -107,7 +107,9 @@ export const getMentioningTweets = async (
                     ?.reverse() || [];
             if (type === "mention-only") return sortedData;
             else {
-                const result = sortedData.filter((tweet) => tweet.author_id != userId);
+                const key = "temp_mute=" + userId
+                const blockedUsers = (await client.keys(key + "*")).map((k) => k.slice(key.length + 1))
+                const result = sortedData.filter((tweet) => ![...blockedUsers, userId].includes(tweet.author_id));
                 const mentionedResult = await getMentioningTweets(
                     userId,
                     token,

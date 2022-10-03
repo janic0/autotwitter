@@ -14,7 +14,7 @@ export default (
 			telegramChatId: config.telegramChatId,
 			userIds: config.userIds,
 		},
-		true
+		60 * 60
 	);
 	return (
 		"https://twitter.com" +

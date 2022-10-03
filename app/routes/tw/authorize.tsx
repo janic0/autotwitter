@@ -122,6 +122,7 @@ const loader = async ({ request }: { request: Request }) => {
 	return json(
 		{
 			name: data.data.name,
+
 			profilePictureURL: data.data["profile_image_url"],
 		},
 		{

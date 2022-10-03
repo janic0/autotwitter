@@ -1,4 +1,5 @@
 import * as redis from "redis";
+import exp from "constants";
 
 const client = redis.createClient({
 	url: process.env.REDIS_URL,
@@ -37,14 +38,14 @@ const del = async (key: string) => {
 	return client.del(key);
 };
 
-const set = async (key: string, value: any, expires = false) => {
+const set = async (key: string, value: any, expiresIn?: number) => {
 	if (!key) return console.trace("WARNING: SET called without key");
 	if (!value) return console.trace("WARNING: SET called without value");
 	const encoded = JSON.stringify(value);
 	await ensureClientOpen();
 	cache[key] = value;
 	return client.set(key, encoded || "", {
-		EX: expires ? 60 * 60 : undefined,
+		EX: expiresIn ? expiresIn : undefined,
 	});
 };
 

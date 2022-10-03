@@ -109,6 +109,30 @@ const intervalHandler = async () => {
                             `Removed from account (@${userMeta.username}). Use /start to relink.`
                         );
                     }
+                } else if (message.message.text === "/mute") {
+                    const lock = await telegramLock.get(message.message.chat.id)
+                    if (lock) {
+                        const value = await get("temp_mute=" + lock?.account_id + "=" + lock.reply_queue_item.tweet.author_id)
+                        if (value) {
+                            sendTelegramMessage(message.message.chat.id, "This person is already muted.")
+                        } else {
+                            sendTelegramMessage(message.message.chat.id, "How long do you want to mute " + lock.reply_queue_item.tweet.author?.name + " (@" + lock.reply_queue_item.tweet.author?.username + ") for?", {
+                                inline_keyboard: [[{
+                                    text: "1h",
+                                    callback_data: "temp_mute=" + lock.reply_queue_item.tweet.author_id + "=" + "1h"
+                                }, {
+                                    text: "24h",
+                                    callback_data: "temp_mute=" + lock.reply_queue_item.tweet.author_id + "=" + "24h"
+                                }], [{
+                                    text: "1w",
+                                    callback_data: "temp_mute=" + lock.reply_queue_item.tweet.author_id + "=" + "1w"
+                                }, {
+                                    text: "4w",
+                                    callback_data: "temp_mute=" + lock.reply_queue_item.tweet.author_id + "=" + "4w"
+                                }], [{text: "Cancel", callback_data: "cancel"}]]
+                            })
+                        }
+                    } else sendTelegramMessage(message.message.chat.id, "You're not viewing a tweet.")
                 } else if (message.message.text) {
                     const accountIds = await getAccountsWithTelegramID(
                         message.message.chat.id
@@ -162,9 +186,7 @@ const intervalHandler = async () => {
                                 sendTelegramMessage(lock.chat_id, "Failed to send response.");
                             continue;
                         } else telegramLock.clear(lock.chat_id);
-                    }
-
-                    else if (message.message.text.length > 280)
+                    } else if (message.message.text.length > 280)
                         sendTelegramMessage(
                             message.message.chat.id,
                             "Message too long. Please use a shorter message."
@@ -263,14 +285,16 @@ const intervalHandler = async () => {
                         if (token) {
                             const key = type === "like" ? "liked" : "retweeted";
                             const lock = await telegramLock.get(message.callback_query.from.id);
-                            replyQueue.modify({...item, [key]: !item[key]}, undefined, lock?.reply_queue_item?.tweet?.id == presumedId)
+                            replyQueue.modify({
+                                ...item,
+                                [key]: !item[key]
+                            }, undefined, lock?.reply_queue_item?.tweet?.id == presumedId)
                             likeOrRetweetTweet(type, item, token).then((value) => {
                                 if (message.callback_query) answerCallbackQuery(message.callback_query.id, value ? `Tweet is now ${value.value ? key : "not " + key}` : "Failed to like tweet.")
                             });
                         } else answerCallbackQuery(message.callback_query.id, "We don't have access to your twitter account.")
                     } else answerCallbackQuery(message.callback_query.id, "Tweet not found. This shouldn't happen.")
-                }
-                if (message.callback_query.data === "skip_queue_item") {
+                } else if (message.callback_query.data === "skip_queue_item") {
                     const lock = await telegramLock.get(message.callback_query.from.id);
                     if (lock && lock.reply_queue_item) {
                         const updatedItem: replyQueueItem = {
@@ -282,11 +306,10 @@ const intervalHandler = async () => {
 
                         await replyQueue.modify(updatedItem, lock.message_id, false);
                         const nextItem = await replyQueue.nextItem(lock.chat_id);
-                        const replyOptions: string[] = nextItem ? ["Sure, moving on.", "Next one!", `Check out this tweet by ${nextItem.tweet.author?.name}`, "Going up the timeline", `Next Tweet! Spoilers, it's from ${nextItem.tweet.author?.name}`, `Who's it gonna be? It's ${nextItem.tweet.author?.name}`, lock.reply_queue_item.tweet.author_id != nextItem.tweet.author_id ? `Didn't like ${lock.reply_queue_item.tweet.author?.name}?, maybe you like ${nextItem.tweet.replied_to?.author?.name}`: `Here's another one from ${nextItem.tweet.author?.name}`] : ["Don't have any more tweets for now.", "You're good for now!", "That was all.", "You can go talk to ducks now or something.", "Enjoy your day!"]
+                        const replyOptions: string[] = nextItem ? ["Sure, moving on.", "Next one!", `Check out this tweet by ${nextItem.tweet.author?.name}`, "Going up the timeline", `Next Tweet! Spoilers, it's from ${nextItem.tweet.author?.name}`, `Who's it gonna be? It's ${nextItem.tweet.author?.name}`, lock.reply_queue_item.tweet.author_id != nextItem.tweet.author_id ? `Didn't like ${lock.reply_queue_item.tweet.author?.name}?, maybe you like ${nextItem.tweet.replied_to?.author?.name}` : `Here's another one from ${nextItem.tweet.author?.name}`] : ["Don't have any more tweets for now.", "You're good for now!", "That was all.", "You can go talk to ducks now or something.", "Enjoy your day!"]
                         answerCallbackQuery(message.callback_query.id, replyOptions[Math.floor(Math.random() * replyOptions.length)])
                     } else answerCallbackQuery(message.callback_query.id, "There's no item in the queue.")
-                }
-                if (message.callback_query.data === "delay_queue_item") {
+                } else if (message.callback_query.data === "delay_queue_item") {
                     const lock = await telegramLock.get(message.callback_query.from.id)
                     if (lock && lock.reply_queue_item) {
                         const replyQueueItems = await replyQueue.get(lock.chat_id)
@@ -295,14 +318,16 @@ const intervalHandler = async () => {
                             const replyOptions: string[] = ["I don't have any more tweets. You really don't want to respond to this one?", "Can't escape from this one now!", "What's wrong with this tweet?", "This is the last one."]
                             answerCallbackQuery(message.callback_query.id, replyOptions[Math.floor(Math.random() * replyOptions.length)])
                         } else {
-                            await replyQueue.modify({...lock.reply_queue_item, computed_at: (lastReplyQueueItem?.reported_at || 0) + 1}, lock.message_id, false)
+                            await replyQueue.modify({
+                                ...lock.reply_queue_item,
+                                computed_at: (lastReplyQueueItem?.reported_at || 0) + 1
+                            }, lock.message_id, false)
                             const nextItem = await replyQueue.nextItem(lock.chat_id)
                             const replyOptions: string[] = [(lock.reply_queue_item.tweet.author_id == nextItem?.tweet.author_id ? `Don't want to do this now? Fine! Here's another one from ${nextItem.tweet.author?.name}.` : `Want to do this one from ${nextItem?.tweet.author?.name}`), "Will show it again later!", "Putting that one aside for a minute.", "I'll show it again after some time"]
                             answerCallbackQuery(message.callback_query.id, replyOptions[Math.floor(Math.random() * replyOptions.length)])
                         }
                     } else answerCallbackQuery(message.callback_query.id, "You don't have an active tweet.")
-                }
-                if (message.callback_query.data.startsWith("draft_id=")) {
+                } else if (message.callback_query.data.startsWith("draft_id=")) {
                     const parts = message.callback_query.data.split("=");
                     if (parts.length !== 3) continue;
                     const draftId = parts[1];
@@ -386,6 +411,34 @@ const intervalHandler = async () => {
                             message.callback_query.id,
                             "Unauthorized."
                         );
+                } else if (message.callback_query.data === "cancel") {
+                    editTelegramMessage(message.callback_query.message?.chat.id || 0, message.callback_query.message?.message_id || 0, "Cancelled.", {
+                        inline_keyboard: []
+                    })
+                    answerCallbackQuery(message.callback_query.id, "Got it.")
+                } else if (message.callback_query.data.startsWith("temp_mute=")) {
+                    const parts = message.callback_query.data.slice("temp_mute=".length).split("=")
+                    if (parts.length == 2) {
+                        const lengths = {
+                            "1h": 3600,
+                            "24h": 86400,
+                            "1w": 604800,
+                            "4w": 2419200
+                        } as { [key: string]: number }
+                        if (lengths[parts[1]]) {
+                            const accountIds = await getAccountsWithTelegramID(message.callback_query.from.id)
+                            accountIds.forEach((accountId) => {
+                                set("temp_mute=" + accountId + "=" + parts[0], true, lengths[parts[1]])
+                            })
+                            const replyOptions: string[] = ["Got it. Muted", "That person won't disturb you (for now)", "Sure. I won't show tweets from that person.", "Nice! I got that.", "That's rude! But ok.", "I'm just a bot! Muted."]
+                            answerCallbackQuery(message.callback_query.id, replyOptions[Math.floor(Math.random() * replyOptions.length)])
+                            editTelegramMessage(message.callback_query.message?.chat.id || 0, message.callback_query.message?.message_id || 0, "Person muted.", {
+                                inline_keyboard: []
+                            })
+                        } else answerCallbackQuery(message.callback_query.id, "Duration not found.")
+                    } else
+                        answerCallbackQuery(message.callback_query.id, "Something went wrong.")
+
                 }
             }
         }

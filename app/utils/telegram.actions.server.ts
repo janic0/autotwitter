@@ -4,6 +4,7 @@ import secretsServer from "./secrets.server";
 let offset = 0;
 
 interface message {
+	message_id: number;
 	chat: {
 		id: number;
 	};
