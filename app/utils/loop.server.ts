@@ -29,7 +29,7 @@ const handleIteration = async () => {
                 };
             return acc;
         }, {} as { [key: string]: scheduledTweet[] });
-    Object.keys(tweetsToSendMap).forEach(async (authorId) => {
+    for (const authorId of Object.keys(tweetsToSendMap)) {
         const token = await getToken(authorId);
         if (token) {
             tweetsToSendMap[authorId].forEach((tweet) => {
@@ -37,7 +37,7 @@ const handleIteration = async () => {
                 sendTweet(tweet, token);
             });
         }
-    });
+    }
 };
 
 const reminderIteration = async () => {

@@ -25,14 +25,18 @@ const ensureClientOpen = () => {
 const get = async (key: string) => {
     if (!key) return console.trace("WARNING: Redis GET called without key");
     await ensureClientOpen();
-    if (typeof cache[key] !== "undefined" && (!cache[key] || !cache[key]?.expires || new Date().getTime() < (cache[key]?.expires || 0))) return cache[key]?.value;
+    if (typeof cache[key] !== "undefined" && (cache[key] == null || !cache[key]?.expires || new Date().getTime() < (cache[key]?.expires || 0))) {
+        console.log("Cache hit for", key, cache[key])
+        return cache[key]?.value;
+    }
     const value = await client.get(key);
     if (!value) {
         cache[key] = null;
         return null;
     }
     const parsed = JSON.parse(value);
-    cache[key] = parsed;
+    cache[key] = {value: parsed};
+    console.log("Cache store for", key, parsed)
     return parsed;
 };
 
@@ -57,5 +61,13 @@ const set = async (key: string, value: any, expiresIn?: number) => {
         EX: expiresIn ? expiresIn : undefined,
     });
 };
+
+const set_exp = (key: string, expiresIn: number) => {
+    if (!key) return console.trace("WARNING: EXP called without key")
+    const cachedValue = cache[key]
+    if (cachedValue)
+        cachedValue.expires = new Date().getTime() + expiresIn * 1000
+    return client.expire(key, expiresIn)
+}
 
 export {get, set, del, client};
