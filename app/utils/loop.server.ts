@@ -101,7 +101,7 @@ export const replyQueue = {
     getById: (chat_id: number, tweet_id: string): Promise<replyQueueItem | null> => get(`reply_queue_item=${chat_id}=${tweet_id}`),
 
     add: (item: replyQueueItem) =>
-        set(`reply_queue_item=${item.chat_id}=${item.tweet.id}`, item),
+        set(`reply_queue_item=${item.chat_id}=${item.tweet.id}`, item, 60 * 24 * 7 * 2),
 
     remove: (chat_id: number, tweet_id: string) =>
         client.del(`reply_queue_item=${chat_id}=${tweet_id}`),
