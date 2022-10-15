@@ -1,6 +1,6 @@
 import {getScheduledTweets} from "../routes/schedule";
 import {sendTweetQueryItem} from "./generateTweetGraph.server";
-import {client, del, get, set} from "./redis.server";
+import {client, del, get, set, set_exp} from "./redis.server";
 import {checkFulfillment} from "./schedule.server";
 import secretsServer from "./secrets.server";
 import {sendTelegramMessage} from "./telegram.actions.server";
@@ -109,6 +109,8 @@ export const replyQueue = {
     _modify: (item: replyQueueItem) => {
         set(`reply_queue_item=${item.chat_id}=${item.tweet.id}`, item);
     },
+
+    scheduleExpiration: (item: replyQueueItem) => set_exp(`reply_queue_item=${item.chat_id}=${item.tweet.id}`, 60 * 24 * 3), // 3 days
 
     modify: async (
         item: replyQueueItem,

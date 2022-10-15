@@ -12,7 +12,7 @@ import type {replyQueueItem} from "./types";
 import {
     editTelegramMessage,
     sendTelegramMessage,
-    _getMessages, answerCallbackQuery,
+    _getMessages, answerCallbackQuery, sendMediaGroup,
 } from "./telegram.actions.server";
 
 let hasStarted = false;
@@ -133,6 +133,8 @@ const intervalHandler = async () => {
                             })
                         }
                     } else sendTelegramMessage(message.message.chat.id, "You're not viewing a tweet.")
+                } else if (message.message.text && message.message.text.startsWith("/")) {
+                    sendTelegramMessage(message.message.chat.id, "Command not found.")
                 } else if (message.message.text) {
                     const accountIds = await getAccountsWithTelegramID(
                         message.message.chat.id
@@ -160,6 +162,7 @@ const intervalHandler = async () => {
                                     },
                                 };
                                 await replyQueue.modify(updatedItem, lock.message_id, false);
+                                replyQueue.scheduleExpiration(lock.reply_queue_item)
                                 replyQueue.nextItem(lock.chat_id);
                                 const text = message.message.text;
                                 if (text.length < 275) {
@@ -179,6 +182,7 @@ const intervalHandler = async () => {
                                             const tweetId = await replyToTweet(lastTweetId, `${sections[i]}(${i + 1}/${sectionsAmount})`, token)
                                             if (tweetId) lastTweetId = tweetId;
                                             else break
+
                                         }
                                     }
                                 }
@@ -305,6 +309,7 @@ const intervalHandler = async () => {
                         };
 
                         await replyQueue.modify(updatedItem, lock.message_id, false);
+                        replyQueue.scheduleExpiration(lock.reply_queue_item)
                         const nextItem = await replyQueue.nextItem(lock.chat_id);
                         const replyOptions: string[] = nextItem ? ["Sure, moving on.", "Next one!", `Check out this tweet by ${nextItem.tweet.author?.name}`, "Going up the timeline", `Next Tweet! Spoilers, it's from ${nextItem.tweet.author?.name}`, `Who's it gonna be? It's ${nextItem.tweet.author?.name}`, lock.reply_queue_item.tweet.author_id != nextItem.tweet.author_id ? `Didn't like ${lock.reply_queue_item.tweet.author?.name}?, maybe you like ${nextItem.tweet.replied_to?.author?.name}` : `Here's another one from ${nextItem.tweet.author?.name}`] : ["Don't have any more tweets for now.", "You're good for now!", "That was all.", "You can go talk to ducks now or something.", "Enjoy your day!"]
                         answerCallbackQuery(message.callback_query.id, replyOptions[Math.floor(Math.random() * replyOptions.length)])

@@ -117,7 +117,8 @@ export const getScheduledTweets = (
 				),
 			]);
 		const result: wrappedResult[] = [];
-		userIds.forEach(async (userId, i) => {
+		for (const userId of userIds) {
+			const i = userIds.indexOf(userId);
 			const tweets = await getTweetsForUser(userId, userConfigs?.[i]);
 			result.push({ userId, tweets });
 			if (result.length === userIds.length)
@@ -126,6 +127,6 @@ export const getScheduledTweets = (
 						.sort((a, b) => a.userId.localeCompare(b.userId))
 						.map((r) => r.tweets)
 				);
-		});
+		}
 	});
 };
