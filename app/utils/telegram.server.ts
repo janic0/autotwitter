@@ -139,10 +139,7 @@ const intervalHandler = async () => {
                     const accountIds = await getAccountsWithTelegramID(
                         message.message.chat.id
                     );
-                    console.log("TEXT ENDPOINT REACHED")
-                    console.log(accountIds)
                     const lock = await telegramLock.get(message.message.chat.id);
-                    console.log("LOCK IS", lock)
 
                     if (accountIds.length === 0)
                         sendTelegramMessage(
@@ -151,14 +148,12 @@ const intervalHandler = async () => {
                         );
 
                     else if (lock) {
-                        console.log("LOCK IS GOOD!")
                         const config = await getSingleConfig(lock.account_id);
                         if (
                             config.allowTelegramResponses &&
                             accountIds.includes(lock.account_id)
                         ) {
                             const token = await getToken(lock.account_id);
-                            console.log("TOKEN IS GOOD")
                             if (token) {
                                 const updatedItem: replyQueueItem = {
                                     ...lock.reply_queue_item,
@@ -167,7 +162,6 @@ const intervalHandler = async () => {
                                     },
                                 };
                                 await replyQueue.modify(updatedItem, lock.message_id, false);
-                                console.log("UPDATED MESSAGE IS GOOD", updatedItem)
                                 replyQueue.scheduleExpiration(lock.reply_queue_item)
                                 await replyQueue.nextItem(lock.chat_id);
                                 const text = message.message.text;

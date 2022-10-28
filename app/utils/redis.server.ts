@@ -25,15 +25,16 @@ const ensureClientOpen = () => {
 const get = async (key: string) => {
     if (!key) return console.trace("WARNING: Redis GET called without key");
     await ensureClientOpen();
-    if (typeof cache[key] !== "undefined" && (cache[key] == null || !cache[key]?.expires || new Date().getTime() < (cache[key]?.expires ?? Infinity))) {
+    if (typeof cache[key] !== "undefined" && cache[key] !== null && (!cache[key]?.expires || new Date().getTime() < (cache[key]?.expires ?? Infinity))) {
         return cache[key]?.value;
     }
     const value = await client.get(key);
     if (!value) {
-        cache[key] = null;
         return null;
     }
     const parsed = JSON.parse(value);
+    if (key.startsWith(""))
+    console.log()
     if (cache[key]) (cache[key] as CachedItem).value = parsed
     else cache[key] = {value: parsed}
     return parsed;
