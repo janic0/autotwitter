@@ -25,12 +25,13 @@ const ensureClientOpen = () => {
 const get = async (key: string) => {
     if (!key) return console.trace("WARNING: Redis GET called without key");
     await ensureClientOpen();
-    if (typeof cache[key] !== "undefined" && (cache[key] == null || !cache[key]?.expires || new Date().getTime() < (cache[key]?.expires || 0))) {
+    console.log(cache[key], cache[key] == null, !cache[key]?.expires, new Date().getTime() < (cache[key]?.expires ?? Infinity))
+    if (typeof cache[key] !== "undefined" && (cache[key] == null || !cache[key]?.expires || new Date().getTime() < (cache[key]?.expires ?? Infinity))) {
         console.log("GET", key, "RESPONDING WITH CACHE", cache)
         return cache[key]?.value;
     }
     const value = await client.get(key);
-    console.log("GET", key, "NO-CACHE")
+    console.log("GET", key, "NO-CACHE", cache)
     if (!value) {
         cache[key] = null;
         return null;
@@ -56,7 +57,7 @@ const set = async (key: string, value: any, expiresIn?: number) => {
     await ensureClientOpen();
     cache[key] = {
         value: value,
-        expires: expiresIn ? new Date().getTime() + expiresIn * 1000 : undefined
+        expires: expiresIn ? new Date().getTime() + (expiresIn * 1000) : cache[key]?.expires
     };
     return client.set(key, encoded || "", {
         EX: expiresIn ? expiresIn : undefined,
@@ -68,7 +69,7 @@ const set_exp = (key: string, expiresIn: number) => {
     const cachedValue = cache[key]
     console.log(key, "expires in", expiresIn, "seconds")
     if (cachedValue)
-        cachedValue.expires = new Date().getTime() + expiresIn * 1000
+        cachedValue.expires = new Date().getTime() + (expiresIn * 1000)
     return client.expire(key, expiresIn)
 }
 
