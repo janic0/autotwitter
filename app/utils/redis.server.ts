@@ -26,15 +26,17 @@ const get = async (key: string) => {
     if (!key) return console.trace("WARNING: Redis GET called without key");
     await ensureClientOpen();
     if (typeof cache[key] !== "undefined" && (cache[key] == null || !cache[key]?.expires || new Date().getTime() < (cache[key]?.expires || 0))) {
+        console.log("GET", key, "RESPONDING WITH CACHE", cache)
         return cache[key]?.value;
     }
     const value = await client.get(key);
+    console.log("GET", key, "NO-CACHE")
     if (!value) {
         cache[key] = null;
         return null;
     }
     const parsed = JSON.parse(value);
-    cache[key] = {value: parsed};
+    if (cache[key]) (cache[key] as CachedItem).value = parsed
     return parsed;
 };
 
@@ -47,6 +49,7 @@ const del = async (key: string) => {
 };
 
 const set = async (key: string, value: any, expiresIn?: number) => {
+    console.log("SETTING", key, "TO", value)
     if (!key) return console.trace("WARNING: SET called without key");
     if (!value) return console.trace("WARNING: SET called without value");
     const encoded = JSON.stringify(value);
