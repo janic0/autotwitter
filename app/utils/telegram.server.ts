@@ -161,6 +161,7 @@ const intervalHandler = async () => {
                                         text: message.message.text,
                                     },
                                 };
+                                console.log("Setting RQI to", updatedItem)
                                 await replyQueue.modify(updatedItem, lock.message_id, false);
                                 replyQueue.scheduleExpiration(lock.reply_queue_item)
                                 await replyQueue.nextItem(lock.chat_id);
