@@ -163,7 +163,7 @@ const intervalHandler = async () => {
                                 };
                                 await replyQueue.modify(updatedItem, lock.message_id, false);
                                 replyQueue.scheduleExpiration(lock.reply_queue_item)
-                                replyQueue.nextItem(lock.chat_id);
+                                await replyQueue.nextItem(lock.chat_id);
                                 const text = message.message.text;
                                 if (text.length < 275) {
                                     await replyToTweet(

@@ -106,9 +106,8 @@ export const replyQueue = {
     remove: (chat_id: number, tweet_id: string) =>
         del(`reply_queue_item=${chat_id}=${tweet_id}`),
 
-    _modify: (item: replyQueueItem) => {
-        set(`reply_queue_item=${item.chat_id}=${item.tweet.id}`, item);
-    },
+    _modify: (item: replyQueueItem) =>
+        set(`reply_queue_item=${item.chat_id}=${item.tweet.id}`, item),
 
     scheduleExpiration: (item: replyQueueItem) => set_exp(`reply_queue_item=${item.chat_id}=${item.tweet.id}`, 60 * 24 * 3), // 3 days
 
@@ -117,7 +116,7 @@ export const replyQueue = {
         message_id: number | undefined = item.message_id,
         showOptions: boolean
     ) => {
-        replyQueue._modify(item);
+        await replyQueue._modify(item);
         sendTweetQueryItem(item, showOptions, item.chat_id, message_id);
         const lock = await telegramLock.get(item.chat_id)
         if (lock?.reply_queue_item?.tweet.id === item.tweet.id) telegramLock.set({...lock, reply_queue_item: item})
@@ -125,6 +124,7 @@ export const replyQueue = {
     },
     nextItem: async (chat_id: number): Promise<replyQueueItem | null> => {
         const replyQueueItems = await replyQueue.get(chat_id);
+        console.log(replyQueueItems)
         if (replyQueueItems.length) {
             const targetReplyItem = replyQueueItems[0];
             sendTweetQueryItem(targetReplyItem, true, chat_id);
