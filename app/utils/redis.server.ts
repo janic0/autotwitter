@@ -26,7 +26,7 @@ const get = async (key: string) => {
     if (!key) return console.trace("WARNING: Redis GET called without key");
     await ensureClientOpen();
     if (typeof cache[key] !== "undefined" && (cache[key] == null || !cache[key]?.expires || new Date().getTime() < (cache[key]?.expires ?? Infinity))) {
-        console.log("GET", key, "RESPONDING WITH CACHE", cache)
+        console.log("GET", key, "RESPONDING WITH CACHE")
         return cache[key]?.value;
     }
     const value = await client.get(key);
