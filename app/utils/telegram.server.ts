@@ -329,7 +329,6 @@ export const handleMessage = async (message: result) => {
         message.callback_query.message?.chat.id ||
         message.callback_query.from.id;
       const item = await replyQueue.getById(chat_id, presumedId);
-      console.log(item);
       if (item && item.message_id) {
         const token = await getToken(item.account_id);
         if (token) {

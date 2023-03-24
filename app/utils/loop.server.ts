@@ -1,3 +1,4 @@
+import { unstable_renderSubtreeIntoContainer } from "react-dom";
 import { increaseMetric } from "~/routes/metrics";
 import { getScheduledTweets } from "../routes/schedule";
 import { sendTweetQueryItem } from "./generateTweetGraph.server";
@@ -182,6 +183,10 @@ const telegramResponderIteration = async () => {
                 account_id: userId,
               };
               replyQueue.add(replyQueueItem);
+              increaseMetric("received_tweets", {
+                chat_id: notificationMethods.telegram.toString(),
+                account_id: userId,
+              });
             });
             const lock = await telegramLock.get(notificationMethods.telegram);
             if (lock) return;
