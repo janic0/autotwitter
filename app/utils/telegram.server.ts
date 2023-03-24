@@ -380,18 +380,19 @@ export const handleMessage = async (message: result) => {
         });
         await replyQueue.modify(updatedItem, lock.message_id, false);
         replyQueue.scheduleExpiration(lock.reply_queue_item);
-        const nextItem = await replyQueue.nextItem(lock.chat_id);
-        const replyOptions: string[] = nextItem
+        const update = await replyQueue.nextItem(lock.chat_id);
+        const replyOptions: string[] = update?.item
           ? [
               "Sure, moving on.",
               "Next one!",
-              `Check out this tweet by ${nextItem.tweet.author?.name}`,
+              `Check out this tweet by ${update.item.tweet.author?.name}`,
               "Going up the timeline",
-              `Next Tweet! Spoilers, it's from ${nextItem.tweet.author?.name}`,
-              `Who's it gonna be? It's ${nextItem.tweet.author?.name}`,
-              lock.reply_queue_item.tweet.author_id != nextItem.tweet.author_id
-                ? `Didn't like ${lock.reply_queue_item.tweet.author?.name}?, maybe you like ${nextItem.tweet.replied_to?.author?.name}`
-                : `Here's another one from ${nextItem.tweet.author?.name}`,
+              `Next Tweet! Spoilers, it's from ${update.item.tweet.author?.name}`,
+              `Who's it gonna be? It's ${update.item.tweet.author?.name}`,
+              lock.reply_queue_item.tweet.author_id !=
+              update.item.tweet.author_id
+                ? `Didn't like ${lock.reply_queue_item.tweet.author?.name}?, maybe you like ${update.item.tweet.replied_to?.author?.name}`
+                : `Here's another one from ${update.item.tweet.author?.name}`,
             ]
           : [
               "Don't have any more tweets for now.",
@@ -402,7 +403,8 @@ export const handleMessage = async (message: result) => {
             ];
         answerCallbackQuery(
           message.callback_query.id,
-          replyOptions[Math.floor(Math.random() * replyOptions.length)]
+          replyOptions[Math.floor(Math.random() * replyOptions.length)] +
+            (update ? " (" + update.remaining_items + " left)" : "")
         );
       } else
         answerCallbackQuery(
@@ -437,18 +439,22 @@ export const handleMessage = async (message: result) => {
             lock.message_id,
             false
           );
-          const nextItem = await replyQueue.nextItem(lock.chat_id);
+          const replyQueueUpdate = await replyQueue.nextItem(lock.chat_id);
           const replyOptions: string[] = [
-            lock.reply_queue_item.tweet.author_id == nextItem?.tweet.author_id
-              ? `Don't want to do this now? Fine! Here's another one from ${nextItem.tweet.author?.name}.`
-              : `Want to do this one from ${nextItem?.tweet.author?.name}`,
+            lock.reply_queue_item.tweet.author_id ==
+            replyQueueUpdate?.item?.tweet.author_id
+              ? `Don't want to do this now? Fine! Here's another one from ${replyQueueUpdate.item.tweet.author?.name}.`
+              : `Want to do this one from ${replyQueueUpdate?.item.tweet.author?.name}`,
             "Will show it again later!",
             "Putting that one aside for a minute.",
             "I'll show it again after some time",
           ];
           answerCallbackQuery(
             message.callback_query.id,
-            replyOptions[Math.floor(Math.random() * replyOptions.length)]
+            replyOptions[Math.floor(Math.random() * replyOptions.length)] +
+              " (" +
+              replyQueueUpdate?.remaining_items +
+              " left)"
           );
         }
         increaseMetric("delayed_tweets", {

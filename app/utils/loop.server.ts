@@ -135,12 +135,17 @@ export const replyQueue = {
     if (lock?.reply_queue_item?.tweet.id === item.tweet.id)
       await telegramLock.set({ ...lock, reply_queue_item: item });
   },
-  nextItem: async (chat_id: number): Promise<replyQueueItem | null> => {
+  nextItem: async (
+    chat_id: number
+  ): Promise<{ item: replyQueueItem; remaining_items: number } | null> => {
     const replyQueueItems = await replyQueue.get(chat_id);
     if (replyQueueItems.length) {
       const targetReplyItem = replyQueueItems[0];
-      sendTweetQueryItem(targetReplyItem, true, chat_id);
-      return targetReplyItem;
+      sendTweetQueryItem(targetReplyItem, true, chat_id, undefined);
+      return {
+        item: targetReplyItem,
+        remaining_items: replyQueueItems.length - 1,
+      };
     } else {
       telegramLock.clear(chat_id);
       return null;
