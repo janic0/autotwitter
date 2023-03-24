@@ -129,11 +129,11 @@ export const replyQueue = {
     message_id: number | undefined = item.message_id,
     showOptions: boolean
   ) => {
-    await replyQueue._modify(item);
+    replyQueue._modify(item);
     sendTweetQueryItem(item, showOptions, item.chat_id, message_id);
     const lock = await telegramLock.get(item.chat_id);
     if (lock?.reply_queue_item?.tweet.id === item.tweet.id)
-      await telegramLock.set({ ...lock, reply_queue_item: item });
+      telegramLock.set({ ...lock, reply_queue_item: item });
   },
   nextItem: async (
     chat_id: number

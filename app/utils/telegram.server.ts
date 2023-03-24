@@ -378,7 +378,7 @@ export const handleMessage = async (message: result) => {
           chat_id: lock.chat_id.toString(),
           account_id: lock.account_id.toString(),
         });
-        await replyQueue.modify(updatedItem, lock.message_id, false);
+        replyQueue.modify(updatedItem, lock.message_id, false);
         replyQueue.scheduleExpiration(lock.reply_queue_item);
         const update = await replyQueue.nextItem(lock.chat_id);
         const replyOptions: string[] = update?.item
