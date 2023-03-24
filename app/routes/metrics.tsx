@@ -25,7 +25,9 @@ const makeMetric = (
   let c = "auto_twitter_" + param_name;
   const param_strings = [];
   for (let key in parameters)
-    param_strings.push(key.toString() + '"' + parameters[key].toString() + '"');
+    param_strings.push(
+      key.toString() + '="' + parameters[key].toString() + '"'
+    );
   if (param_strings.length) c += "{" + param_strings.join(",") + "}";
   c += "\t" + value.toString() + "\n";
   return c;
