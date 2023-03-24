@@ -21,10 +21,10 @@ const makeMetric = (
   parameters: { [key: string]: string },
   value: number
 ) => {
-  let c = param_name;
+  let c = "auto_twitter_" + param_name;
   const param_strings = [];
   for (let key in parameters)
-    param_strings.push(key + '"' + parameters[key] + '"');
+    param_strings.push(key.toString() + '"' + parameters[key].toString() + '"');
   if (param_strings.length) c += "{" + param_strings.join(",") + "}";
   c += "\t" + value.toString() + "\n";
   return c;
@@ -41,6 +41,7 @@ export const loader = async (req: LoaderArgs) => {
 
   for (let key in metric_keys) {
     const key_parts = key.slice("metrics_".length).split(";");
+    console.log(key, key_parts);
     const key_value = await get(key);
     metrics_format += makeMetric(
       key_parts[0],
