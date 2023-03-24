@@ -39,9 +39,8 @@ export const loader = async (req: LoaderArgs) => {
 
   let metrics_format = "";
 
-  for (let key in metric_keys) {
+  for (let key of metric_keys) {
     const key_parts = key.slice("metrics_".length).split(";");
-    console.log(key, key_parts);
     const key_value = await get(key);
     metrics_format += makeMetric(
       key_parts[0],
