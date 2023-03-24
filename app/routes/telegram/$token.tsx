@@ -4,13 +4,11 @@ import secretsServer from "~/utils/secrets.server";
 import { handleMessage } from "~/utils/telegram.server";
 
 export const action = (args: ActionArgs) => {
-  console.log("message received");
   if (args.params.token == secretsServer.TELEGRAM_ENDPOINT) {
     args.request
       .json()
       .then((e) => {
-        if (typeof e.message !== "object") return;
-        handleMessage(e);
+        if (typeof e.upadte_id === "number") handleMessage(e);
       })
       .catch((err) => {
         console.log("failed to read body", err);

@@ -17,6 +17,7 @@ import {
   sendMediaGroup,
   result,
 } from "./telegram.actions.server";
+import { increaseMetric } from "~/routes/metrics";
 
 let hasStarted = false;
 
@@ -211,6 +212,10 @@ export const handleMessage = async (message: result) => {
             replyQueue.scheduleExpiration(lock.reply_queue_item);
             await replyQueue.nextItem(lock.chat_id);
             const text = message.message.text;
+            increaseMetric("answered_tweets", {
+              chat_id: lock.chat_id.toString(),
+              account_id: lock.account_id.toString(),
+            });
             if (text.length < 275) {
               await replyToTweet(lock.reply_queue_item.tweet.id, text, token);
             } else {
@@ -252,6 +257,11 @@ export const handleMessage = async (message: result) => {
           },
           accountIds[0]
         );
+        increaseMetric("scheduled_tweets", {
+          chat_id: message.message.chat.id.toString(),
+          account_id: accountIds[0].toString(),
+          multi_account: "true",
+        });
         if (tweet.scheduledDate) {
           const userConfig = await getSingleConfig(tweet.authorId);
 
@@ -325,6 +335,10 @@ export const handleMessage = async (message: result) => {
         if (token) {
           const key = type === "like" ? "liked" : "retweeted";
           const lock = await telegramLock.get(message.callback_query.from.id);
+          increaseMetric("interacted_tweets", {
+            chat_id: chat_id.toString(),
+            type: key,
+          });
           replyQueue.modify(
             {
               ...item,
@@ -361,7 +375,10 @@ export const handleMessage = async (message: result) => {
             text: "",
           },
         };
-
+        increaseMetric("skipped_tweets", {
+          chat_id: lock.chat_id.toString(),
+          account_id: lock.account_id.toString(),
+        });
         await replyQueue.modify(updatedItem, lock.message_id, false);
         replyQueue.scheduleExpiration(lock.reply_queue_item);
         const nextItem = await replyQueue.nextItem(lock.chat_id);
@@ -435,6 +452,10 @@ export const handleMessage = async (message: result) => {
             replyOptions[Math.floor(Math.random() * replyOptions.length)]
           );
         }
+        increaseMetric("delayed_tweets", {
+          chat_id: lock.chat_id.toString(),
+          account_id: lock.account_id.toString(),
+        });
       } else
         answerCallbackQuery(
           message.callback_query.id,
@@ -469,9 +490,13 @@ export const handleMessage = async (message: result) => {
               },
               accountMeta.id
             );
+            increaseMetric("answered_tweets", {
+              chat_id: draftResult.chat_id.toString(),
+              account_id: accountId.toString(),
+            });
+
             if (tweet.scheduledDate) {
               const userConfig = await getSingleConfig(tweet.authorId);
-
               const sd = new Date(
                 tweet.scheduledDate - userConfig.time.tz * 60 * 1000
               );
@@ -546,7 +571,16 @@ export const handleMessage = async (message: result) => {
               true,
               lengths[parts[1]]
             );
+            increaseMetric("mute_events", {
+              chat_id: (
+                message.callback_query?.from.id ||
+                message.callback_query?.message?.chat.id ||
+                ""
+              ).toString(),
+              account_id: accountId,
+            });
           });
+
           const replyOptions: string[] = [
             "Got it. Muted",
             "That person won't disturb you (for now)",
