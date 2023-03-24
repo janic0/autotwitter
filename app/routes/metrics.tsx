@@ -4,7 +4,8 @@ import { get, set, client } from "~/utils/redis.server";
 import secretsServer from "~/utils/secrets.server";
 
 const authHeader = secretsServer.PROMETHEUS_PW
-  ? Buffer.from("prometheus:" + secretsServer.PROMETHEUS_PW).toString("base64")
+  ? "Basic " +
+    Buffer.from("prometheus:" + secretsServer.PROMETHEUS_PW).toString("base64")
   : undefined;
 
 export const increaseMetric = async (
