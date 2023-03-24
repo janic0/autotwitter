@@ -9,7 +9,7 @@ export const action = (args: ActionArgs) => {
     args.request
       .json()
       .then((e) => {
-        if (typeof e.message === "object") return;
+        if (typeof e.message !== "object") return;
         handleMessage(e);
       })
       .catch((err) => {
