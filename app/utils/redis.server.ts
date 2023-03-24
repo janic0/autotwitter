@@ -2,7 +2,7 @@ import * as redis from "redis";
 import exp from "constants";
 
 const client = redis.createClient({
-    url: process.env.REDIS_URL,
+  url: process.env.REDIS_URL,
 });
 
 client.connect();
@@ -10,66 +10,70 @@ client.connect();
 client.on("error", (err) => console.log("Redis Client Error", err));
 
 interface CachedItem {
-    value: any;
-    expires?: number;
+  value: any;
+  expires?: number;
 }
-
 
 let cache: { [key: string]: CachedItem | null } = {};
 
 const ensureClientOpen = () => {
-    if (client.isOpen) return;
-    return client.connect();
+  if (client.isOpen) return;
+  return client.connect();
 };
 
 const get = async (key: string) => {
-    if (!key) return console.trace("WARNING: Redis GET called without key");
-    await ensureClientOpen();
-    if (typeof cache[key] !== "undefined" && cache[key] !== null && (!cache[key]?.expires || new Date().getTime() < (cache[key]?.expires ?? Infinity))) {
-        return cache[key]?.value;
-    }
-    const value = await client.get(key);
-    if (!value) {
-        return null;
-    }
-    const parsed = JSON.parse(value);
-    if (key.startsWith(""))
-    console.log()
-    if (cache[key]) (cache[key] as CachedItem).value = parsed
-    else cache[key] = {value: parsed}
-    return parsed;
+  if (!key) return console.trace("WARNING: Redis GET called without key");
+  await ensureClientOpen();
+  if (
+    typeof cache[key] !== "undefined" &&
+    cache[key] !== null &&
+    (!cache[key]?.expires ||
+      new Date().getTime() < (cache[key]?.expires ?? Infinity))
+  ) {
+    return cache[key]?.value;
+  }
+  const value = await client.get(key);
+  if (!value) {
+    return null;
+  }
+  const parsed = JSON.parse(value);
+  if (cache[key]) (cache[key] as CachedItem).value = parsed;
+  else cache[key] = { value: parsed };
+  return parsed;
 };
 
 const del = async (key: string) => {
-    if (!key) return console.trace("WARNING: DEL called without key");
-    await ensureClientOpen();
+  if (!key) return console.trace("WARNING: DEL called without key");
+  await ensureClientOpen();
 
-    cache[key] = null;
-    return client.del(key);
+  cache[key] = null;
+  return client.del(key);
 };
 
 const set = async (key: string, value: any, expiresIn?: number) => {
-    console.log("SETTING", key, "TO", value)
-    if (!key) return console.trace("WARNING: SET called without key");
-    if (!value) return console.trace("WARNING: SET called without value");
-    const encoded = JSON.stringify(value);
-    await ensureClientOpen();
-    cache[key] = {
-        value: value,
-        expires: expiresIn ? new Date().getTime() + (expiresIn * 1000) : cache[key]?.expires
-    };
-    return client.set(key, encoded || "", {
-        EX: expiresIn ? expiresIn : undefined,
-    });
+  console.log("SETTING", key, "TO", value);
+  if (!key) return console.trace("WARNING: SET called without key");
+  if (!value) return console.trace("WARNING: SET called without value");
+  const encoded = JSON.stringify(value);
+  await ensureClientOpen();
+  cache[key] = {
+    value: value,
+    expires: expiresIn
+      ? new Date().getTime() + expiresIn * 1000
+      : cache[key]?.expires,
+  };
+  return client.set(key, encoded || "", {
+    EX: expiresIn ? expiresIn : undefined,
+  });
 };
 
 const set_exp = (key: string, expiresIn: number) => {
-    if (!key) return console.trace("WARNING: EXP called without key")
-    const cachedValue = cache[key]
-    console.log(key, "expires in", expiresIn, "seconds")
-    if (cachedValue)
-        cachedValue.expires = new Date().getTime() + (expiresIn * 1000)
-    return client.expire(key, expiresIn)
-}
+  if (!key) return console.trace("WARNING: EXP called without key");
+  const cachedValue = cache[key];
+  console.log(key, "expires in", expiresIn, "seconds");
+  if (cachedValue)
+    cachedValue.expires = new Date().getTime() + expiresIn * 1000;
+  return client.expire(key, expiresIn);
+};
 
-export {get, set, del, set_exp, client};
+export { get, set, del, set_exp, client };

@@ -8,7 +8,7 @@ export const action = (args: ActionArgs) => {
     args.request
       .json()
       .then((e) => {
-        if (typeof e.upadte_id === "number") handleMessage(e);
+        if (typeof e.update_id === "number") handleMessage(e);
       })
       .catch((err) => {
         console.log("failed to read body", err);
