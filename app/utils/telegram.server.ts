@@ -208,9 +208,9 @@ export const handleMessage = async (message: result) => {
                 text: message.message.text,
               },
             };
-            await replyQueue.modify(updatedItem, lock.message_id, false);
+            replyQueue.modify(updatedItem, lock.message_id, false);
             replyQueue.scheduleExpiration(lock.reply_queue_item);
-            await replyQueue.nextItem(lock.chat_id);
+            replyQueue.nextItem(lock.chat_id);
             const text = message.message.text;
             increaseMetric("answered_tweets", {
               chat_id: lock.chat_id.toString(),
@@ -431,7 +431,7 @@ export const handleMessage = async (message: result) => {
             replyOptions[Math.floor(Math.random() * replyOptions.length)]
           );
         } else {
-          await replyQueue.modify(
+          replyQueue.modify(
             {
               ...lock.reply_queue_item,
               computed_at: (lastReplyQueueItem?.reported_at || 0) + 1,
